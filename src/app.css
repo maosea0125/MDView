@@ -1,0 +1,191 @@
+/* ============================================
+   md-view Global Styles & Theme System
+   ============================================ */
+
+/* Light theme (default) */
+:root,
+html[data-theme='light'] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --toolbar-bg: #f6f8fa;
+  --sidebar-bg: #f6f8fa;
+  --border-color: #d1d9e0;
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  --active-bg: rgba(0, 0, 0, 0.08);
+  --accent-color: #0969da;
+  --drop-overlay-bg: rgba(9, 105, 218, 0.08);
+  --drop-overlay-border: #0969da;
+
+  /* Alert colors */
+  --alert-note-bg: #ddf4ff;
+  --alert-note-border: #54aeff;
+  --alert-note-text: #0969da;
+  --alert-tip-bg: #dafbe1;
+  --alert-tip-border: #4ac26b;
+  --alert-tip-text: #1a7f37;
+  --alert-important-bg: #fbefff;
+  --alert-important-border: #a475f9;
+  --alert-important-text: #8250df;
+  --alert-warning-bg: #fff8c5;
+  --alert-warning-border: #d4a72c;
+  --alert-warning-text: #9a6700;
+  --alert-caution-bg: #ffebe9;
+  --alert-caution-border: #ff8182;
+  --alert-caution-text: #d1242f;
+}
+
+/* Dark theme */
+html[data-theme='dark'] {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --toolbar-bg: #161b22;
+  --sidebar-bg: #161b22;
+  --border-color: #30363d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --hover-bg: rgba(255, 255, 255, 0.05);
+  --active-bg: rgba(255, 255, 255, 0.08);
+  --accent-color: #58a6ff;
+  --drop-overlay-bg: rgba(88, 166, 255, 0.08);
+  --drop-overlay-border: #58a6ff;
+
+  --alert-note-bg: #0d1d30;
+  --alert-note-border: #1f6feb;
+  --alert-note-text: #58a6ff;
+  --alert-tip-bg: #0b1d0f;
+  --alert-tip-border: #238636;
+  --alert-tip-text: #3fb950;
+  --alert-important-bg: #1b0d2e;
+  --alert-important-border: #8957e5;
+  --alert-important-text: #a371f7;
+  --alert-warning-bg: #272115;
+  --alert-warning-border: #9e6a03;
+  --alert-warning-text: #d29922;
+  --alert-caution-bg: #220c0c;
+  --alert-caution-border: #da3633;
+  --alert-caution-text: #f85149;
+}
+
+/* Base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* GitHub Alerts */
+.markdown-alert {
+  padding: 8px 16px;
+  margin-bottom: 16px;
+  border-left: 4px solid;
+  border-radius: 0 6px 6px 0;
+}
+
+.markdown-alert-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.markdown-alert-note {
+  background: var(--alert-note-bg);
+  border-color: var(--alert-note-border);
+}
+.markdown-alert-note .markdown-alert-title { color: var(--alert-note-text); }
+
+.markdown-alert-tip {
+  background: var(--alert-tip-bg);
+  border-color: var(--alert-tip-border);
+}
+.markdown-alert-tip .markdown-alert-title { color: var(--alert-tip-text); }
+
+.markdown-alert-important {
+  background: var(--alert-important-bg);
+  border-color: var(--alert-important-border);
+}
+.markdown-alert-important .markdown-alert-title { color: var(--alert-important-text); }
+
+.markdown-alert-warning {
+  background: var(--alert-warning-bg);
+  border-color: var(--alert-warning-border);
+}
+.markdown-alert-warning .markdown-alert-title { color: var(--alert-warning-text); }
+
+.markdown-alert-caution {
+  background: var(--alert-caution-bg);
+  border-color: var(--alert-caution-border);
+}
+.markdown-alert-caution .markdown-alert-title { color: var(--alert-caution-text); }
+
+/* Welcome screen */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--text-secondary);
+  gap: 16px;
+}
+
+.welcome h2 {
+  font-size: 24px;
+  font-weight: 300;
+  color: var(--text-primary);
+}
+
+.welcome p {
+  font-size: 14px;
+}
+
+/* Drop overlay */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--drop-overlay-bg);
+  border: 3px dashed var(--drop-overlay-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--accent-color);
+  pointer-events: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Override github-markdown-css background for dark theme */
+html[data-theme='dark'] .markdown-body {
+  color-scheme: dark;
+  --color-fg-default: #e6edf3;
+  --color-canvas-default: #0d1117;
+  --color-border-default: #30363d;
+}
