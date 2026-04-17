@@ -1,14 +1,17 @@
 <script lang="ts">
   import morphdom from 'morphdom';
-  import { onMount } from 'svelte';
+  import { MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, BASE_FONT_SIZE } from '$lib/zoom';
 
   interface Props {
     html: string;
     hasMermaid: boolean;
+    zoom: number;
+    onZoomChange: (zoom: number) => void;
   }
 
-  let { html, hasMermaid }: Props = $props();
+  let { html, hasMermaid, zoom, onZoomChange }: Props = $props();
   let previewEl: HTMLDivElement;
+  let wrapperEl: HTMLDivElement;
   let mermaidLoaded = false;
 
   function updateDOM(newHtml: string) {
@@ -59,10 +62,19 @@
       }
     }
   });
+
+  function handleWheel(e: WheelEvent) {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round((zoom + delta) * 10) / 10));
+      onZoomChange(newZoom);
+    }
+  }
 </script>
 
-<div class="preview-wrapper">
-  <article class="markdown-body" bind:this={previewEl}>
+<div class="preview-wrapper" bind:this={wrapperEl} onwheel={handleWheel}>
+  <article class="markdown-body" bind:this={previewEl} style="font-size: {zoom * BASE_FONT_SIZE}px">
     <!-- Content injected via morphdom -->
   </article>
 </div>

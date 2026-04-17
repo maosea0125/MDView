@@ -6,6 +6,7 @@
   import Toolbar from '$lib/components/Toolbar.svelte';
   import Preview from '$lib/components/Preview.svelte';
   import TOCSidebar from '$lib/components/TOCSidebar.svelte';
+  import { MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, ZOOM_STORAGE_KEY, clampZoom, loadSavedZoom } from '$lib/zoom';
   import 'github-markdown-css/github-markdown.css';
   import 'katex/dist/katex.min.css';
 
@@ -17,6 +18,16 @@
   let tocVisible = $state(false);
   let theme = $state<'light' | 'dark'>('light');
   let isDragging = $state(false);
+  let zoom = $state(loadSavedZoom());
+
+  function setZoom(value: number) {
+    zoom = clampZoom(value);
+    localStorage.setItem(ZOOM_STORAGE_KEY, String(zoom));
+  }
+
+  function zoomIn() { setZoom(zoom + ZOOM_STEP); }
+  function zoomOut() { setZoom(zoom - ZOOM_STEP); }
+  function resetZoom() { setZoom(1.0); }
 
   // Theme management
   function setTheme(t: 'light' | 'dark') {
@@ -68,6 +79,15 @@
     } else if (mod && e.shiftKey && (e.key === 't' || e.key === 'T')) {
       e.preventDefault();
       toggleTheme();
+    } else if (mod && (e.key === '=' || e.key === '+')) {
+      e.preventDefault();
+      zoomIn();
+    } else if (mod && e.key === '-') {
+      e.preventDefault();
+      zoomOut();
+    } else if (mod && e.key === '0') {
+      e.preventDefault();
+      resetZoom();
     }
   }
 
@@ -137,6 +157,27 @@
       },
     });
 
+    const zoomInItem = await MenuItem.new({
+      id: 'zoom_in',
+      text: '放大',
+      accelerator: 'CmdOrCtrl+Plus',
+      action: () => zoomIn(),
+    });
+
+    const zoomOutItem = await MenuItem.new({
+      id: 'zoom_out',
+      text: '缩小',
+      accelerator: 'CmdOrCtrl+Minus',
+      action: () => zoomOut(),
+    });
+
+    const zoomResetItem = await MenuItem.new({
+      id: 'zoom_reset',
+      text: '重置缩放',
+      accelerator: 'CmdOrCtrl+0',
+      action: () => resetZoom(),
+    });
+
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
 
     const quitItem = await MenuItem.new({
@@ -157,7 +198,7 @@
 
     const viewSubmenu = await Submenu.new({
       text: '视图',
-      items: [themeItem, tocItem],
+      items: [themeItem, tocItem, await PredefinedMenuItem.new({ item: 'Separator' }), zoomInItem, zoomOutItem, zoomResetItem],
     });
 
     const menu = await Menu.new({
@@ -195,13 +236,17 @@
     onToggleToc={() => tocVisible = !tocVisible}
     {theme}
     {tocVisible}
+    {zoom}
+    onZoomIn={zoomIn}
+    onZoomOut={zoomOut}
+    onZoomReset={resetZoom}
   />
 
   <div class="main-content">
     <TOCSidebar items={tocItems} visible={tocVisible} />
 
     {#if markdownContent}
-      <Preview html={rendered.html} hasMermaid={rendered.hasMermaid} />
+      <Preview html={rendered.html} hasMermaid={rendered.hasMermaid} {zoom} onZoomChange={setZoom} />
     {:else}
       <div class="welcome">
         <h2>MDView</h2>

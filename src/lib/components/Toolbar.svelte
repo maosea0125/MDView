@@ -6,9 +6,15 @@
     onToggleToc: () => void;
     theme: string;
     tocVisible: boolean;
+    zoom: number;
+    onZoomIn: () => void;
+    onZoomOut: () => void;
+    onZoomReset: () => void;
   }
 
-  let { fileName, onOpenFile, onToggleTheme, onToggleToc, theme, tocVisible }: Props = $props();
+  let { fileName, onOpenFile, onToggleTheme, onToggleToc, theme, tocVisible, zoom, onZoomIn, onZoomOut, onZoomReset }: Props = $props();
+
+  let zoomPercent = $derived(Math.round(zoom * 100));
 </script>
 
 <div class="toolbar">
@@ -22,6 +28,19 @@
     <span class="file-name">{fileName || '未打开文件'}</span>
   </div>
   <div class="toolbar-right">
+    <div class="zoom-controls">
+      <button class="toolbar-btn" onclick={onZoomOut} title="缩小 (Cmd/Ctrl+-)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.156a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11zM3.5 7.5h5v1h-5z"/>
+        </svg>
+      </button>
+      <button class="zoom-label" onclick={onZoomReset} title="重置缩放 (Cmd/Ctrl+0)">{zoomPercent}%</button>
+      <button class="toolbar-btn" onclick={onZoomIn} title="放大 (Cmd/Ctrl+=)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.156a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11zM8 5.5a.5.5 0 0 1 .5.5v1.5H10a.5.5 0 0 1 0 1H8.5V10a.5.5 0 0 1-1 0V8.5H6a.5.5 0 0 1 0-1h1.5V6a.5.5 0 0 1 .5-.5z"/>
+        </svg>
+      </button>
+    </div>
     <button class="toolbar-btn" onclick={onToggleToc} title={tocVisible ? '关闭目录' : '展示目录'} class:active={tocVisible}>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
         <path d="M2 3h12v1H2zm0 3h12v1H2zm0 3h12v1H2zm0 3h12v1H2z"/>
@@ -70,6 +89,30 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 400px;
+  }
+
+  .zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .zoom-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    min-width: 42px;
+    text-align: center;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    padding: 2px 4px;
+    height: 28px;
+  }
+
+  .zoom-label:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
   }
 
   .toolbar-btn {
