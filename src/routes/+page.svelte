@@ -91,34 +91,7 @@
     }
   }
 
-  // Drag and drop
-  function handleDragOver(e: DragEvent) {
-    e.preventDefault();
-    isDragging = true;
-  }
-
-  function handleDragLeave() {
-    isDragging = false;
-  }
-
-  async function handleDrop(e: DragEvent) {
-    e.preventDefault();
-    isDragging = false;
-    const files = e.dataTransfer?.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      if (file.name.match(/\.(md|markdown|mdown|mkd|mdx)$/i)) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          fileName = file.name;
-          markdownContent = reader.result as string;
-          rendered = renderMarkdown(markdownContent);
-          tocItems = extractToc(markdownContent);
-        };
-        reader.readAsText(file);
-      }
-    }
-  }
+  // Drag and drop (handled via Tauri native events in onMount)
 
   onMount(async () => {
     // Restore theme
@@ -211,6 +184,26 @@
       loadFile(event.payload);
     });
 
+    // Set up Tauri's native drag and drop handling
+    const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+    const appWindow = getCurrentWebviewWindow();
+    await appWindow.onDragDropEvent((event) => {
+      if (event.payload.type === 'enter') {
+        isDragging = true;
+      } else if (event.payload.type === 'leave') {
+        isDragging = false;
+      } else if (event.payload.type === 'drop') {
+        isDragging = false;
+        const paths = event.payload.paths;
+        if (paths && paths.length > 0) {
+          const path = paths[0];
+          if (path.match(/\.(md|markdown|mdown|mkd|mdx)$/i)) {
+            loadFile(path);
+          }
+        }
+      }
+    });
+
     // Listen for system theme changes
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
       if (!localStorage.getItem('md-view-theme')) {
@@ -225,9 +218,6 @@
 <div
   class="app-container"
   role="application"
-  ondragover={handleDragOver}
-  ondragleave={handleDragLeave}
-  ondrop={handleDrop}
 >
   <Toolbar
     {fileName}
