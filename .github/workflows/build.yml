@@ -36,8 +36,18 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+        if: matrix.rust_target == ''
+
+      - name: Install Rust stable (with target)
+        uses: dtolnay/rust-toolchain@stable
+        if: matrix.rust_target != ''
         with:
           targets: ${{ matrix.rust_target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
 
       - name: Install dependencies (npm)
         run: npm ci

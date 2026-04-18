@@ -46,22 +46,19 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
-            if let tauri::RunEvent::Opened { urls } = event {
-                let mut has_files = false;
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &event {
                 for url in urls {
                     if let Ok(path) = url.to_file_path() {
                         if let Some(p) = path.to_str() {
-                            // Try emit directly first (works if frontend is ready)
                             let _ = app.emit("open-file", p.to_string());
-                            // Also store in pending (frontend will poll on mount)
                             if let Some(state) = app.try_state::<PendingFiles>() {
                                 state.0.lock().unwrap().push(p.to_string());
                             }
-                            has_files = true;
                         }
                     }
                 }
-                let _ = has_files;
             }
+            let _ = (app, event);
         });
 }
