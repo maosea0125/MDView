@@ -30,14 +30,19 @@
   <div class="toolbar-right">
     <div class="zoom-controls">
       <button class="toolbar-btn" onclick={onZoomOut} title="缩小 (Cmd/Ctrl+-)">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.156a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11zM3.5 7.5h5v1h-5z"/>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="7" cy="7" r="4.5"/>
+          <line x1="10.2" y1="10.2" x2="14" y2="14"/>
+          <line x1="5" y1="7" x2="9" y2="7"/>
         </svg>
       </button>
       <button class="zoom-label" onclick={onZoomReset} title="重置缩放 (Cmd/Ctrl+0)">{zoomPercent}%</button>
       <button class="toolbar-btn" onclick={onZoomIn} title="放大 (Cmd/Ctrl+=)">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.156a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11zM8 5.5a.5.5 0 0 1 .5.5v1.5H10a.5.5 0 0 1 0 1H8.5V10a.5.5 0 0 1-1 0V8.5H6a.5.5 0 0 1 0-1h1.5V6a.5.5 0 0 1 .5-.5z"/>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="7" cy="7" r="4.5"/>
+          <line x1="10.2" y1="10.2" x2="14" y2="14"/>
+          <line x1="5" y1="7" x2="9" y2="7"/>
+          <line x1="7" y1="5" x2="7" y2="9"/>
         </svg>
       </button>
     </div>

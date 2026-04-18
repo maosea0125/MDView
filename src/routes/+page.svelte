@@ -6,50 +6,200 @@
   import Toolbar from '$lib/components/Toolbar.svelte';
   import Preview from '$lib/components/Preview.svelte';
   import TOCSidebar from '$lib/components/TOCSidebar.svelte';
-  import { MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, ZOOM_STORAGE_KEY, clampZoom, loadSavedZoom } from '$lib/zoom';
-  import 'github-markdown-css/github-markdown.css';
+  import TabBar from '$lib/components/TabBar.svelte';
+  import type { Tab } from '$lib/types';
+  import { MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, clampZoom } from '$lib/zoom';
+  import lightMdCss from 'github-markdown-css/github-markdown-light.css?inline';
+  import darkMdCss from 'github-markdown-css/github-markdown-dark.css?inline';
   import 'katex/dist/katex.min.css';
 
-  let filePath = $state('');
-  let fileName = $state('');
-  let markdownContent = $state('');
-  let rendered = $state<RenderResult>({ html: '', frontMatter: '', hasMermaid: false });
-  let tocItems = $state<TocItem[]>([]);
-  let tocVisible = $state(false);
-  let theme = $state<'light' | 'dark'>('light');
+  let tabs = $state<Tab[]>([]);
+  let activeTabId = $state('');
+  let globalTheme = $state<'light' | 'dark'>('light');
   let isDragging = $state(false);
-  let zoom = $state(loadSavedZoom());
 
-  function setZoom(value: number) {
-    zoom = clampZoom(value);
-    localStorage.setItem(ZOOM_STORAGE_KEY, String(zoom));
+  // Derived: active tab
+  let activeTab = $derived(tabs.find(t => t.id === activeTabId));
+
+  // Tab helpers
+  let tabIdCounter = 0;
+  function newTabId(): string { return `tab-${++tabIdCounter}-${Date.now()}`; }
+
+  function createTab(filePath: string, fileName: string, content: string): Tab {
+    const rendered = renderMarkdown(content);
+    const tocItems = extractToc(content);
+    return {
+      id: newTabId(),
+      filePath,
+      fileName,
+      content,
+      rendered,
+      tocItems,
+      tocVisible: false,
+      zoom: 1.0,
+      scrollTop: 0,
+    };
   }
 
-  function zoomIn() { setZoom(zoom + ZOOM_STEP); }
-  function zoomOut() { setZoom(zoom - ZOOM_STEP); }
+  function updateActiveTab(updater: (tab: Tab) => void) {
+    const idx = tabs.findIndex(t => t.id === activeTabId);
+    if (idx < 0) return;
+    updater(tabs[idx]);
+    tabs = [...tabs]; // trigger reactivity
+  }
+
+  function selectTab(id: string) {
+    if (activeTab) {
+      // Save scroll position of leaving tab
+      const previewWrapper = document.querySelector('.preview-wrapper');
+      if (previewWrapper) {
+        updateActiveTab(t => { t.scrollTop = previewWrapper.scrollTop; });
+      }
+    }
+    activeTabId = id;
+    const tab = tabs.find(t => t.id === id);
+    // Restore scroll position after DOM update
+    requestAnimationFrame(() => {
+      const previewWrapper = document.querySelector('.preview-wrapper');
+      if (previewWrapper && tab) {
+        previewWrapper.scrollTop = tab.scrollTop;
+      }
+    });
+  }
+
+  function closeTab(id: string) {
+    const idx = tabs.findIndex(t => t.id === id);
+    if (idx < 0) return;
+    tabs = tabs.filter(t => t.id !== id);
+    if (activeTabId === id) {
+      if (tabs.length > 0) {
+        const newIdx = Math.min(idx, tabs.length - 1);
+        selectTab(tabs[newIdx].id);
+      } else {
+        activeTabId = '';
+      }
+    }
+  }
+
+  // Zoom operations on active tab
+  function setZoom(value: number) {
+    updateActiveTab(t => { t.zoom = clampZoom(value); });
+  }
+  function zoomIn() { if (activeTab) setZoom(activeTab.zoom + ZOOM_STEP); }
+  function zoomOut() { if (activeTab) setZoom(activeTab.zoom - ZOOM_STEP); }
   function resetZoom() { setZoom(1.0); }
 
+  // TOC toggle on active tab
+  function toggleToc() {
+    updateActiveTab(t => { t.tocVisible = !t.tocVisible; });
+  }
+
+  // Reorder tabs
+  function reorderTabs(fromIndex: number, toIndex: number) {
+    const newTabs = [...tabs];
+    const [moved] = newTabs.splice(fromIndex, 1);
+    newTabs.splice(toIndex, 0, moved);
+    tabs = newTabs;
+  }
+
+  // Close other tabs (keep the specified tab)
+  function closeOtherTabs(id: string) {
+    tabs = tabs.filter(t => t.id === id);
+    selectTab(id);
+  }
+
+  // Close tabs to the right
+  function closeRightTabs(id: string) {
+    const idx = tabs.findIndex(t => t.id === id);
+    if (idx < 0) return;
+    tabs = tabs.slice(0, idx + 1);
+    if (!tabs.find(t => t.id === activeTabId)) {
+      selectTab(id);
+    }
+  }
+
+  // Reload tab (re-read file from disk)
+  async function reloadTab(id: string) {
+    const tab = tabs.find(t => t.id === id);
+    if (!tab || !tab.filePath) return;
+    try {
+      const content: string = await invoke('read_markdown_file', { path: tab.filePath });
+      const rendered = renderMarkdown(content);
+      tabs = tabs.map(t => t.id === id ? { ...t, content, rendered } : t) as typeof tabs;
+    } catch (e) {
+      console.error('Failed to reload file:', e);
+    }
+  }
+
   // Theme management
-  function setTheme(t: 'light' | 'dark') {
-    theme = t;
+  function applyMarkdownTheme(t: 'light' | 'dark') {
+    let el = document.getElementById('github-md-theme');
+    if (!el) {
+      el = document.createElement('style');
+      el.id = 'github-md-theme';
+      document.head.appendChild(el);
+    }
+    el.textContent = t === 'dark' ? darkMdCss : lightMdCss;
+  }
+
+  function applyTheme(t: 'light' | 'dark') {
     document.documentElement.setAttribute('data-theme', t);
+    applyMarkdownTheme(t);
+  }
+
+  function setGlobalTheme(t: 'light' | 'dark') {
+    globalTheme = t;
     localStorage.setItem('md-view-theme', t);
+    applyTheme(t);
   }
 
   function toggleTheme() {
-    setTheme(theme === 'light' ? 'dark' : 'light');
+    setGlobalTheme(globalTheme === 'light' ? 'dark' : 'light');
   }
+
+  // Recent files
+  const RECENT_FILES_KEY = 'md-view-recent-files';
+  const MAX_RECENT = 10;
+
+  function getRecentFiles(): string[] {
+    try {
+      const raw = localStorage.getItem(RECENT_FILES_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  }
+
+  function addRecentFile(path: string) {
+    let recent = getRecentFiles().filter(p => p !== path);
+    recent.unshift(path);
+    if (recent.length > MAX_RECENT) recent = recent.slice(0, MAX_RECENT);
+    localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(recent));
+    rebuildRecentMenu();
+  }
+
+  function clearRecentFiles() {
+    localStorage.removeItem(RECENT_FILES_KEY);
+    rebuildRecentMenu();
+  }
+
+  // Will be set in onMount after menu is built
+  let rebuildRecentMenu: () => void = () => {};
 
   // File operations
   async function loadFile(path: string) {
     try {
+      // Check if file is already open
+      const existing = tabs.find(t => t.filePath === path);
+      if (existing) {
+        selectTab(existing.id);
+        addRecentFile(path);
+        return;
+      }
       const content: string = await invoke('read_markdown_file', { path });
       const name: string = await invoke('get_file_name', { path });
-      filePath = path;
-      fileName = name;
-      markdownContent = content;
-      rendered = renderMarkdown(content);
-      tocItems = extractToc(content);
+      const tab = createTab(path, name, content);
+      tabs = [...tabs, tab];
+      selectTab(tab.id);
+      addRecentFile(path);
     } catch (e) {
       console.error('Failed to load file:', e);
     }
@@ -60,10 +210,13 @@
       const { open } = await import('@tauri-apps/plugin-dialog');
       const selected = await open({
         filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'mdown', 'mkd', 'mdx'] }],
-        multiple: false,
+        multiple: true,
       });
       if (selected) {
-        await loadFile(selected as string);
+        const paths = Array.isArray(selected) ? selected : [selected];
+        for (const p of paths) {
+          await loadFile(p as string);
+        }
       }
     } catch (e) {
       console.error('Failed to open dialog:', e);
@@ -88,18 +241,21 @@
     } else if (mod && e.key === '0') {
       e.preventDefault();
       resetZoom();
+    } else if (mod && e.key === 'w') {
+      e.preventDefault();
+      if (activeTabId) closeTab(activeTabId);
     }
   }
-
-  // Drag and drop (handled via Tauri native events in onMount)
 
   onMount(async () => {
     // Restore theme
     const savedTheme = localStorage.getItem('md-view-theme');
     if (savedTheme === 'dark' || savedTheme === 'light') {
-      setTheme(savedTheme);
+      setGlobalTheme(savedTheme);
     } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark');
+      setGlobalTheme('dark');
+    } else {
+      applyMarkdownTheme('light');
     }
 
     // Build native menu via JS API
@@ -110,6 +266,13 @@
       text: '打开文件...',
       accelerator: 'CmdOrCtrl+O',
       action: () => openFileDialog(),
+    });
+
+    const closeTabItem = await MenuItem.new({
+      id: 'close_tab',
+      text: '关闭标签',
+      accelerator: 'CmdOrCtrl+W',
+      action: () => { if (activeTabId) closeTab(activeTabId); },
     });
 
     const separator = await PredefinedMenuItem.new({ item: 'Separator' });
@@ -124,16 +287,18 @@
     const tocItem = await MenuItem.new({
       id: 'toggle_toc',
       text: '展示目录',
+      accelerator: 'CmdOrCtrl+Shift+L',
       action: async () => {
-        tocVisible = !tocVisible;
-        await tocItem.setText(tocVisible ? '关闭目录' : '展示目录');
+        toggleToc();
+        const tab = tabs.find(t => t.id === activeTabId);
+        await tocItem.setText(tab?.tocVisible ? '关闭目录' : '展示目录');
       },
     });
 
     const zoomInItem = await MenuItem.new({
       id: 'zoom_in',
       text: '放大',
-      accelerator: 'CmdOrCtrl+Plus',
+      accelerator: 'CmdOrCtrl+=',
       action: () => zoomIn(),
     });
 
@@ -160,13 +325,50 @@
       action: async () => { await getCurrentWindow().close(); },
     });
 
+    // Recent files submenu
+    const recentSubmenu = await Submenu.new({
+      id: 'recent_files',
+      text: '最近打开',
+      items: [],
+    });
+
+    async function _rebuildRecentMenu() {
+      // Remove all existing items
+      const existingItems = await recentSubmenu.items();
+      for (const item of existingItems) {
+        await recentSubmenu.remove(item);
+      }
+
+      const recent = getRecentFiles();
+      if (recent.length === 0) {
+        const emptyItem = await MenuItem.new({ id: 'recent_empty', text: '(无)', enabled: false });
+        await recentSubmenu.append(emptyItem);
+      } else {
+        for (let i = 0; i < recent.length; i++) {
+          const p = recent[i];
+          const name = p.split('/').pop() || p;
+          const item = await MenuItem.new({
+            id: `recent_${i}`,
+            text: name,
+            action: () => loadFile(p),
+          });
+          await recentSubmenu.append(item);
+        }
+        await recentSubmenu.append(await PredefinedMenuItem.new({ item: 'Separator' }));
+        const clearItem = await MenuItem.new({
+          id: 'clear_recent',
+          text: '清除最近打开',
+          action: () => clearRecentFiles(),
+        });
+        await recentSubmenu.append(clearItem);
+      }
+    }
+    rebuildRecentMenu = _rebuildRecentMenu;
+    await _rebuildRecentMenu();
+
     const fileSubmenu = await Submenu.new({
       text: '文件',
-      items: [
-        openItem,
-        separator,
-        quitItem,
-      ],
+      items: [openItem, closeTabItem, separator, recentSubmenu, await PredefinedMenuItem.new({ item: 'Separator' }), quitItem],
     });
 
     const viewSubmenu = await Submenu.new({
@@ -179,10 +381,16 @@
     });
     await menu.setAsAppMenu();
 
-    // Listen for file open from Rust (CLI args or file association)
+    // Listen for file open from Rust (file association while app is running)
     listen<string>('open-file', (event) => {
       loadFile(event.payload);
     });
+
+    // Check for pending files (from CLI args or file association on launch)
+    const pendingFiles: string[] = await invoke('get_pending_files');
+    for (const filePath of pendingFiles) {
+      await loadFile(filePath);
+    }
 
     // Set up Tauri's native drag and drop handling
     const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
@@ -196,9 +404,10 @@
         isDragging = false;
         const paths = event.payload.paths;
         if (paths && paths.length > 0) {
-          const path = paths[0];
-          if (path.match(/\.(md|markdown|mdown|mkd|mdx)$/i)) {
-            loadFile(path);
+          for (const path of paths) {
+            if (path.match(/\.(md|markdown|mdown|mkd|mdx)$/i)) {
+              loadFile(path);
+            }
           }
         }
       }
@@ -207,36 +416,37 @@
     // Listen for system theme changes
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
       if (!localStorage.getItem('md-view-theme')) {
-        setTheme(e.matches ? 'dark' : 'light');
+        setGlobalTheme(e.matches ? 'dark' : 'light');
       }
     });
   });
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} oncontextmenu={(e) => e.preventDefault()} />
 
 <div
   class="app-container"
   role="application"
 >
   <Toolbar
-    {fileName}
+    fileName={activeTab?.fileName ?? ''}
     onOpenFile={openFileDialog}
     onToggleTheme={toggleTheme}
-    onToggleToc={() => tocVisible = !tocVisible}
-    {theme}
-    {tocVisible}
-    {zoom}
+    onToggleToc={toggleToc}
+    theme={globalTheme}
+    tocVisible={activeTab?.tocVisible ?? false}
+    zoom={activeTab?.zoom ?? 1.0}
     onZoomIn={zoomIn}
     onZoomOut={zoomOut}
     onZoomReset={resetZoom}
   />
 
-  <div class="main-content">
-    <TOCSidebar items={tocItems} visible={tocVisible} />
+  <TabBar {tabs} {activeTabId} onSelectTab={selectTab} onCloseTab={closeTab} onReorderTabs={reorderTabs} onCloseOtherTabs={closeOtherTabs} onCloseRightTabs={closeRightTabs} onReloadTab={reloadTab} />
 
-    {#if markdownContent}
-      <Preview html={rendered.html} hasMermaid={rendered.hasMermaid} {zoom} onZoomChange={setZoom} />
+  <div class="main-content">
+    {#if activeTab}
+      <TOCSidebar items={activeTab.tocItems} visible={activeTab.tocVisible} />
+      <Preview html={activeTab.rendered.html} hasMermaid={activeTab.rendered.hasMermaid} zoom={activeTab.zoom} onZoomChange={setZoom} />
     {:else}
       <div class="welcome">
         <h2>MDView</h2>

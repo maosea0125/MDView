@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[tauri::command]
 fn read_markdown_file(path: String) -> Result<String, String> {
@@ -16,28 +16,52 @@ fn get_file_name(path: String) -> String {
         .unwrap_or_default()
 }
 
-struct WatchedFile(Mutex<Option<String>>);
+/// Pending file paths from file associations or CLI, waiting for frontend ready
+struct PendingFiles(Mutex<Vec<String>>);
+
+/// Frontend calls this to get any files that need to be opened
+#[tauri::command]
+fn get_pending_files(state: tauri::State<PendingFiles>) -> Vec<String> {
+    let mut pending = state.0.lock().unwrap();
+    pending.drain(..).collect()
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .manage(WatchedFile(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![read_markdown_file, get_file_name])
+        .manage(PendingFiles(Mutex::new(Vec::new())))
+        .invoke_handler(tauri::generate_handler![read_markdown_file, get_file_name, get_pending_files])
         .setup(|app| {
             // Check if a file path was passed as CLI argument
             let args: Vec<String> = std::env::args().collect();
             if args.len() > 1 {
                 let path = args[1].clone();
-                let handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                    let _ = handle.emit("open-file", path);
-                });
+                let pending = app.state::<PendingFiles>();
+                pending.0.lock().unwrap().push(path);
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Opened { urls } = event {
+                let mut has_files = false;
+                for url in urls {
+                    if let Ok(path) = url.to_file_path() {
+                        if let Some(p) = path.to_str() {
+                            // Try emit directly first (works if frontend is ready)
+                            let _ = app.emit("open-file", p.to_string());
+                            // Also store in pending (frontend will poll on mount)
+                            if let Some(state) = app.try_state::<PendingFiles>() {
+                                state.0.lock().unwrap().push(p.to_string());
+                            }
+                            has_files = true;
+                        }
+                    }
+                }
+                let _ = has_files;
+            }
+        });
 }
