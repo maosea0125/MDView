@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MDView — 轻量 Markdown 预览工具</title>
+  <meta name="description" content="MDView 是一款基于 Tauri v2 的轻量级跨平台 Markdown 预览工具，支持数学公式、Mermaid 图表、多标签页。">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-deep: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1a2332;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.25);
+      --text: #e2e8f0;
+      --text-dim: #94a3b8;
+      --text-muted: #64748b;
+      --border: rgba(148, 163, 184, 0.1);
+      --radius: 12px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-deep);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ===== NOISE OVERLAY ===== */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ===== GRID BACKGROUND ===== */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== HERO ===== */
+    .hero {
+      text-align: center;
+      padding: 120px 0 80px;
+      position: relative;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .hero-icon {
+      width: 96px;
+      height: 96px;
+      margin-bottom: 32px;
+      border-radius: 24px;
+      box-shadow: 0 0 60px var(--accent-glow);
+      animation: float 6s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .hero h1 {
+      font-size: 56px;
+      font-weight: 700;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: 20px;
+      color: var(--text-dim);
+      font-weight: 300;
+      max-width: 520px;
+      margin: 0 auto 40px;
+    }
+
+    .hero-badges {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 13px;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+    }
+
+    /* ===== DOWNLOAD BUTTONS ===== */
+    .download-group {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(148, 163, 184, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .btn svg {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    /* ===== SECTION ===== */
+    section {
+      padding: 80px 0;
+    }
+
+    .section-title {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    .section-desc {
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 16px;
+      margin-bottom: 56px;
+    }
+
+    /* ===== FEATURES GRID ===== */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: all 0.25s;
+    }
+
+    .feature-card:hover {
+      border-color: rgba(59, 130, 246, 0.3);
+      background: var(--bg-card-hover);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .feature-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      margin-bottom: 16px;
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    .feature-card h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    /* ===== TECH STACK ===== */
+    .stack-row {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .stack-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 500;
+      transition: border-color 0.2s;
+    }
+
+    .stack-chip:hover {
+      border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .stack-chip img {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* ===== DOWNLOAD SECTION ===== */
+    .download-section {
+      text-align: center;
+    }
+
+    .platform-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .platform-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 24px;
+      text-align: center;
+      transition: all 0.25s;
+    }
+
+    .platform-card:hover {
+      border-color: rgba(59, 130, 246, 0.3);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .platform-card .platform-icon {
+      font-size: 36px;
+      margin-bottom: 16px;
+    }
+
+    .platform-card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .platform-card .arch {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    .platform-card .btn {
+      width: 100%;
+      justify-content: center;
+      padding: 10px 16px;
+      font-size: 14px;
+    }
+
+    /* ===== FOOTER ===== */
+    footer {
+      text-align: center;
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    footer a {
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    footer a:hover {
+      color: var(--accent);
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      .hero { padding: 80px 0 60px; }
+      .hero h1 { font-size: 36px; }
+      .hero-sub { font-size: 16px; }
+      .features-grid { grid-template-columns: 1fr; }
+      .platform-cards { grid-template-columns: 1fr; max-width: 360px; }
+      .download-group { flex-direction: column; align-items: center; }
+    }
+
+    @media (max-width: 480px) {
+      .hero h1 { font-size: 28px; }
+      .container { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HERO ===== -->
+  <div class="hero">
+    <div class="container">
+      <img class="hero-icon" src="icon.png" alt="MDView">
+      <h1>MDView</h1>
+      <p class="hero-sub">轻量、快速、跨平台的 Markdown 预览工具<br>基于 Tauri v2 构建，原生性能体验</p>
+
+      <div class="hero-badges">
+        <span class="badge"><span class="badge-dot"></span>v0.2.0</span>
+        <span class="badge">MIT License</span>
+        <span class="badge">macOS · Windows</span>
+      </div>
+
+      <div class="download-group">
+        <a class="btn btn-primary" href="https://github.com/maosea0125/MDView/releases/latest">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          下载最新版本
+        </a>
+        <a class="btn btn-secondary" href="https://github.com/maosea0125/MDView">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FEATURES ===== -->
+  <section>
+    <div class="container">
+      <h2 class="section-title">功能特性</h2>
+      <p class="section-desc">专注阅读体验，覆盖主流 Markdown 扩展语法</p>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">📝</div>
+          <h3>完整 Markdown 支持</h3>
+          <p>GFM 表格、任务列表、脚注、Emoji、Front Matter、锚点导航</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📐</div>
+          <h3>数学公式</h3>
+          <p>KaTeX 渲染引擎，支持行内和块级 LaTeX 公式</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>Mermaid 图表</h3>
+          <p>流程图、时序图、甘特图，支持弹窗放大至 1500% 查看细节</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📑</div>
+          <h3>多标签页</h3>
+          <p>同时打开多个文件，拖拽排序，右键快捷操作</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🌗</div>
+          <h3>主题切换</h3>
+          <p>明亮 / 暗黑主题一键切换，跟随 GitHub 渲染风格</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📂</div>
+          <h3>文件关联</h3>
+          <p>系统右键菜单直接打开，拖放文件，最近文件快速访问</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔍</div>
+          <h3>缩放控制</h3>
+          <p>Cmd/Ctrl +/- 快捷键调整字号，自由缩放预览</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📋</div>
+          <h3>目录导航</h3>
+          <p>自动从标题提取目录，侧边栏一键跳转对应章节</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>原生性能</h3>
+          <p>Tauri v2 + Rust 后端，安装包 &lt; 10MB，启动秒开</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== TECH STACK ===== -->
+  <section>
+    <div class="container">
+      <h2 class="section-title">技术栈</h2>
+      <p class="section-desc">现代化工程架构，高性能与轻量化兼得</p>
+
+      <div class="stack-row">
+        <span class="stack-chip">🦀 Tauri v2</span>
+        <span class="stack-chip">🔶 SvelteKit</span>
+        <span class="stack-chip">📘 TypeScript</span>
+        <span class="stack-chip">📝 markdown-it</span>
+        <span class="stack-chip">📐 KaTeX</span>
+        <span class="stack-chip">📊 Mermaid</span>
+        <span class="stack-chip">🔄 morphdom</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== DOWNLOAD ===== -->
+  <section class="download-section" id="download">
+    <div class="container">
+      <h2 class="section-title">下载安装</h2>
+      <p class="section-desc">选择你的平台，立即开始</p>
+
+      <div class="platform-cards">
+        <div class="platform-card">
+          <div class="platform-icon">🍎</div>
+          <h3>macOS</h3>
+          <p class="arch">Apple Silicon</p>
+          <a class="btn btn-primary" href="https://github.com/maosea0125/MDView/releases/latest">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            .dmg
+          </a>
+        </div>
+        <div class="platform-card">
+          <div class="platform-icon">🍎</div>
+          <h3>macOS</h3>
+          <p class="arch">Intel x86_64</p>
+          <a class="btn btn-primary" href="https://github.com/maosea0125/MDView/releases/latest">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            .dmg
+          </a>
+        </div>
+        <div class="platform-card">
+          <div class="platform-icon">🪟</div>
+          <h3>Windows</h3>
+          <p class="arch">x64</p>
+          <a class="btn btn-primary" href="https://github.com/maosea0125/MDView/releases/latest">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            .msi
+          </a>
+        </div>
+      </div>
+
+      <p style="margin-top: 32px; color: var(--text-muted); font-size: 13px;">
+        macOS 首次打开可能需要在「系统设置 → 隐私与安全性」中允许打开
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="https://github.com/maosea0125/MDView">GitHub</a>
+        <a href="https://github.com/maosea0125/MDView/releases">Releases</a>
+        <a href="https://github.com/maosea0125/MDView/issues">Issues</a>
+      </div>
+      <p>MDView · MIT License · Built with Tauri v2 + SvelteKit</p>
+    </div>
+  </footer>
+
+</body>
+</html>
