@@ -163,6 +163,63 @@ html, body {
   pointer-events: none;
 }
 
+/* ===== PDF Print Styles ===== */
+@media print {
+  /* Hide all UI chrome */
+  .toolbar,
+  .tab-bar,
+  .toc-sidebar,
+  .drop-overlay,
+  .mermaid-modal-overlay {
+    display: none !important;
+  }
+
+  :global(.mermaid-magnify-btn) {
+    display: none !important;
+  }
+
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .app-container {
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  .main-content {
+    overflow: visible !important;
+    height: auto !important;
+    display: block !important;
+  }
+
+  /* Remove scroll container constraints */
+  .preview-wrapper {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+  }
+
+  /* Reset zoom (inline font-size overridden by !important) */
+  .markdown-body {
+    font-size: 14px !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Avoid page breaks inside elements */
+  h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+  pre, blockquote, table, .mermaid-container { break-inside: avoid; }
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;

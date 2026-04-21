@@ -4,15 +4,17 @@
     onOpenFile: () => void;
     onToggleTheme: () => void;
     onToggleToc: () => void;
+    onExportPdf: () => void;
     theme: string;
     tocVisible: boolean;
     zoom: number;
     onZoomIn: () => void;
     onZoomOut: () => void;
     onZoomReset: () => void;
+    hasContent: boolean;
   }
 
-  let { fileName, onOpenFile, onToggleTheme, onToggleToc, theme, tocVisible, zoom, onZoomIn, onZoomOut, onZoomReset }: Props = $props();
+  let { fileName, onOpenFile, onToggleTheme, onToggleToc, onExportPdf, theme, tocVisible, zoom, onZoomIn, onZoomOut, onZoomReset, hasContent }: Props = $props();
 
   let zoomPercent = $derived(Math.round(zoom * 100));
 </script>
@@ -49,6 +51,14 @@
     <button class="toolbar-btn" onclick={onToggleToc} title={tocVisible ? '关闭目录' : '展示目录'} class:active={tocVisible}>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
         <path d="M2 3h12v1H2zm0 3h12v1H2zm0 3h12v1H2zm0 3h12v1H2z"/>
+      </svg>
+    </button>
+    <button class="toolbar-btn" onclick={onExportPdf} title="导出 PDF (Cmd/Ctrl+Shift+E)" disabled={!hasContent}>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/>
+        <polyline points="10 2 10 5 13 5"/>
+        <line x1="5" y1="9" x2="11" y2="9"/>
+        <line x1="5" y1="12" x2="8" y2="12"/>
       </svg>
     </button>
     <button class="toolbar-btn" onclick={onToggleTheme} title="切换主题 (Cmd/Ctrl+Shift+T)">

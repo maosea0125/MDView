@@ -223,6 +223,31 @@
     }
   }
 
+  // PDF export
+  async function exportPdf() {
+    if (!activeTab) return;
+    const h1Match = activeTab.content.match(/^#\s+(.+)/m);
+    const pdfTitle = h1Match
+      ? h1Match[1].trim()
+      : activeTab.fileName.replace(/\.[^.]+$/, '');
+
+    const markdownBody = document.querySelector('.markdown-body') as HTMLElement | null;
+    const prevFontSize = markdownBody?.style.fontSize ?? '';
+    const prevTitle = document.title;
+
+    if (markdownBody) markdownBody.style.fontSize = '';
+    document.title = pdfTitle;
+
+    window.addEventListener('afterprint', () => {
+      document.title = prevTitle;
+      if (markdownBody) markdownBody.style.fontSize = prevFontSize;
+    }, { once: true });
+
+    // Wait one runloop tick so WKWebView syncs document.title → native title
+    await new Promise(r => setTimeout(r, 50));
+    await invoke('print_page');
+  }
+
   // Keyboard shortcuts
   function handleKeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;
@@ -244,6 +269,9 @@
     } else if (mod && e.key === 'w') {
       e.preventDefault();
       if (activeTabId) closeTab(activeTabId);
+    } else if (mod && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+      e.preventDefault();
+      exportPdf();
     }
   }
 
@@ -273,6 +301,13 @@
       text: '关闭标签',
       accelerator: 'CmdOrCtrl+W',
       action: () => { if (activeTabId) closeTab(activeTabId); },
+    });
+
+    const exportPdfItem = await MenuItem.new({
+      id: 'export_pdf',
+      text: '导出 PDF...',
+      accelerator: 'CmdOrCtrl+Shift+E',
+      action: () => exportPdf(),
     });
 
     const separator = await PredefinedMenuItem.new({ item: 'Separator' });
@@ -368,7 +403,7 @@
 
     const fileSubmenu = await Submenu.new({
       text: '文件',
-      items: [openItem, closeTabItem, separator, recentSubmenu, await PredefinedMenuItem.new({ item: 'Separator' }), quitItem],
+      items: [openItem, closeTabItem, exportPdfItem, separator, recentSubmenu, await PredefinedMenuItem.new({ item: 'Separator' }), quitItem],
     });
 
     const viewSubmenu = await Submenu.new({
@@ -433,12 +468,14 @@
     onOpenFile={openFileDialog}
     onToggleTheme={toggleTheme}
     onToggleToc={toggleToc}
+    onExportPdf={exportPdf}
     theme={globalTheme}
     tocVisible={activeTab?.tocVisible ?? false}
     zoom={activeTab?.zoom ?? 1.0}
     onZoomIn={zoomIn}
     onZoomOut={zoomOut}
     onZoomReset={resetZoom}
+    hasContent={!!activeTab}
   />
 
   <TabBar {tabs} {activeTabId} onSelectTab={selectTab} onCloseTab={closeTab} onReorderTabs={reorderTabs} onCloseOtherTabs={closeOtherTabs} onCloseRightTabs={closeRightTabs} onReloadTab={reloadTab} />
