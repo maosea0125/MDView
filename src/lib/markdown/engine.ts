@@ -106,7 +106,7 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   const lang = token.info.trim().toLowerCase();
   if (lang === 'mermaid') {
     const escaped = md.utils.escapeHtml(token.content);
-    return `<div class="mermaid-container"><pre class="mermaid">${escaped}</pre></div>\n`;
+    return `<div class="mermaid-container"><div class="mermaid">${escaped}</div></div>\n`;
   }
   return defaultFence(tokens, idx, options, env, self);
 };

@@ -32,13 +32,19 @@ fn print_page(window: tauri::WebviewWindow) -> Result<(), String> {
     window.print().map_err(|e| e.to_string())
 }
 
+/// Write binary data to a file path (used for Word/DOCX export)
+#[tauri::command]
+fn write_binary_file(path: String, data: Vec<u8>) -> Result<(), String> {
+    fs::write(&path, &data).map_err(|e| format!("Failed to write file: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(PendingFiles(Mutex::new(Vec::new())))
-        .invoke_handler(tauri::generate_handler![read_markdown_file, get_file_name, get_pending_files, print_page])
+        .invoke_handler(tauri::generate_handler![read_markdown_file, get_file_name, get_pending_files, print_page, write_binary_file])
         .setup(|app| {
             // Check if a file path was passed as CLI argument
             let args: Vec<String> = std::env::args().collect();

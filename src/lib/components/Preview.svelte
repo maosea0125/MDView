@@ -44,31 +44,47 @@
   }
 
   async function renderMermaid() {
-    if (!hasMermaid) return;
+    if (!hasMermaid || !previewEl) return;
+    const mermaid = (await import('mermaid')).default;
     if (!mermaidLoaded) {
-      const mermaid = await import('mermaid');
-      mermaid.default.initialize({
+      mermaid.initialize({
         startOnLoad: false,
         theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
       });
       mermaidLoaded = true;
     }
-    const mermaid = await import('mermaid');
-    mermaid.default.initialize({
-      startOnLoad: false,
-      theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
-    });
-    try {
-      await mermaid.default.run({ querySelector: '.mermaid:not([data-processed])' });
-    } catch {
-      // Mermaid syntax errors are expected for incomplete diagrams
+
+    const els = Array.from(previewEl.querySelectorAll<HTMLElement>('.mermaid:not([data-processed])'));
+    if (els.length === 0) return;
+
+    let idCounter = Date.now();
+    for (const el of els) {
+      // textContent decodes HTML entities to get the raw mermaid source
+      const code = el.textContent?.trim() ?? '';
+      if (!code) {
+        el.setAttribute('data-processed', 'true');
+        continue;
+      }
+      try {
+        const id = `mermaid-${idCounter++}`;
+        const { svg } = await mermaid.render(id, code);
+        // Inject SVG inline. WKWebView CSS text fix is handled via CSS rule below.
+        el.innerHTML = svg;
+        // Store SVG string for magnify modal
+        const container = el.closest<HTMLElement>('.mermaid-container') ?? el;
+        container.dataset.mermaidSvg = svg;
+        el.setAttribute('data-processed', 'true');
+      } catch (e) {
+        console.error('Mermaid render error:', e);
+        el.setAttribute('data-processed', 'true');
+      }
     }
     addMagnifyButtons();
   }
 
   function addMagnifyButtons() {
     if (!previewEl) return;
-    const containers = previewEl.querySelectorAll('.mermaid-container');
+    const containers = previewEl.querySelectorAll<HTMLElement>('.mermaid-container');
     containers.forEach((container) => {
       if (container.querySelector('.mermaid-magnify-btn')) return;
       const btn = document.createElement('button');
@@ -82,10 +98,8 @@
       </svg>`;
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const mermaidEl = container.querySelector('.mermaid');
-        if (mermaidEl) {
-          openModal(mermaidEl.innerHTML);
-        }
+        const svgContent = container.dataset.mermaidSvg;
+        if (svgContent) openModal(svgContent);
       });
       container.appendChild(btn);
     });
@@ -253,6 +267,22 @@
     justify-content: center;
     margin: 16px 0;
     overflow-x: auto;
+  }
+
+  /* Hide raw mermaid source text before rendering */
+  :global(.mermaid:not([data-processed])) {
+    display: none;
+  }
+
+  /* WKWebView fix: style elements inside inline SVG render their text content as visible.
+     Setting display:none hides the text without affecting CSS application. */
+  :global(.mermaid style) {
+    display: none !important;
+  }
+
+  :global(.mermaid svg) {
+    max-width: 100%;
+    height: auto;
   }
 
   :global(.mermaid-magnify-btn) {

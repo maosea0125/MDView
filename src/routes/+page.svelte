@@ -248,6 +248,37 @@
     await invoke('print_page');
   }
 
+  // Word export
+  async function exportWord() {
+    if (!activeTab) return;
+    const h1Match = activeTab.content.match(/^#\s+(.+)/m);
+    const docTitle = h1Match
+      ? h1Match[1].trim()
+      : activeTab.fileName.replace(/\.[^.]+$/, '');
+
+    // Open save dialog first
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const savePath = await save({
+      title: '导出 Word 文档',
+      defaultPath: `${docTitle}.docx`,
+      filters: [{ name: 'Word 文档', extensions: ['docx'] }],
+    });
+    if (!savePath) return;
+
+    try {
+      // Get rendered HTML from the DOM
+      const markdownBody = document.querySelector('.markdown-body') as HTMLElement | null;
+      if (!markdownBody) return;
+
+      const { htmlToDocxBytes } = await import('$lib/docx-export');
+      const bytes = await htmlToDocxBytes(markdownBody.innerHTML);
+      await invoke('write_binary_file', { path: savePath, data: Array.from(bytes) });
+    } catch (err) {
+      console.error('Word export failed:', err);
+      alert(`导出失败：${err}`);
+    }
+  }
+
   // Keyboard shortcuts
   function handleKeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;
@@ -272,6 +303,9 @@
     } else if (mod && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
       e.preventDefault();
       exportPdf();
+    } else if (mod && e.shiftKey && (e.key === 'd' || e.key === 'D')) {
+      e.preventDefault();
+      exportWord();
     }
   }
 
@@ -308,6 +342,13 @@
       text: '导出 PDF...',
       accelerator: 'CmdOrCtrl+Shift+E',
       action: () => exportPdf(),
+    });
+
+    const exportWordItem = await MenuItem.new({
+      id: 'export_word',
+      text: '导出 Word...',
+      accelerator: 'CmdOrCtrl+Shift+D',
+      action: () => exportWord(),
     });
 
     const separator = await PredefinedMenuItem.new({ item: 'Separator' });
@@ -403,7 +444,7 @@
 
     const fileSubmenu = await Submenu.new({
       text: '文件',
-      items: [openItem, closeTabItem, exportPdfItem, separator, recentSubmenu, await PredefinedMenuItem.new({ item: 'Separator' }), quitItem],
+      items: [openItem, closeTabItem, exportPdfItem, exportWordItem, separator, recentSubmenu, await PredefinedMenuItem.new({ item: 'Separator' }), quitItem],
     });
 
     const viewSubmenu = await Submenu.new({
@@ -469,6 +510,7 @@
     onToggleTheme={toggleTheme}
     onToggleToc={toggleToc}
     onExportPdf={exportPdf}
+    onExportWord={exportWord}
     theme={globalTheme}
     tocVisible={activeTab?.tocVisible ?? false}
     zoom={activeTab?.zoom ?? 1.0}

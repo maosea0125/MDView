@@ -5,6 +5,7 @@
     onToggleTheme: () => void;
     onToggleToc: () => void;
     onExportPdf: () => void;
+    onExportWord: () => void;
     theme: string;
     tocVisible: boolean;
     zoom: number;
@@ -14,7 +15,7 @@
     hasContent: boolean;
   }
 
-  let { fileName, onOpenFile, onToggleTheme, onToggleToc, onExportPdf, theme, tocVisible, zoom, onZoomIn, onZoomOut, onZoomReset, hasContent }: Props = $props();
+  let { fileName, onOpenFile, onToggleTheme, onToggleToc, onExportPdf, onExportWord, theme, tocVisible, zoom, onZoomIn, onZoomOut, onZoomReset, hasContent }: Props = $props();
 
   let zoomPercent = $derived(Math.round(zoom * 100));
 </script>
@@ -59,6 +60,13 @@
         <polyline points="10 2 10 5 13 5"/>
         <line x1="5" y1="9" x2="11" y2="9"/>
         <line x1="5" y1="12" x2="8" y2="12"/>
+      </svg>
+    </button>
+    <button class="toolbar-btn" onclick={onExportWord} title="导出 Word (Cmd/Ctrl+Shift+D)" disabled={!hasContent}>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/>
+        <polyline points="10 2 10 5 13 5"/>
+        <text x="4.5" y="13" font-size="5" font-family="sans-serif" font-weight="bold" fill="currentColor" stroke="none">W</text>
       </svg>
     </button>
     <button class="toolbar-btn" onclick={onToggleTheme} title="切换主题 (Cmd/Ctrl+Shift+T)">
