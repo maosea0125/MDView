@@ -6,6 +6,8 @@
     onToggleToc: () => void;
     onExportPdf: () => void;
     onExportWord: () => void;
+    onRefresh: () => void;
+    onCopy: () => void;
     theme: string;
     tocVisible: boolean;
     zoom: number;
@@ -15,7 +17,7 @@
     hasContent: boolean;
   }
 
-  let { fileName, onOpenFile, onToggleTheme, onToggleToc, onExportPdf, onExportWord, theme, tocVisible, zoom, onZoomIn, onZoomOut, onZoomReset, hasContent }: Props = $props();
+  let { fileName, onOpenFile, onToggleTheme, onToggleToc, onExportPdf, onExportWord, onRefresh, onCopy, theme, tocVisible, zoom, onZoomIn, onZoomOut, onZoomReset, hasContent }: Props = $props();
 
   let zoomPercent = $derived(Math.round(zoom * 100));
 </script>
@@ -52,6 +54,18 @@
     <button class="toolbar-btn" onclick={onToggleToc} title={tocVisible ? '关闭目录' : '展示目录'} class:active={tocVisible}>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
         <path d="M2 3h12v1H2zm0 3h12v1H2zm0 3h12v1H2zm0 3h12v1H2z"/>
+      </svg>
+    </button>
+    <button class="toolbar-btn" onclick={onRefresh} title="刷新 (Cmd/Ctrl+R)" disabled={!hasContent}>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13.5 2.5A6.5 6.5 0 1 1 8 1.5"/>
+        <polyline points="11 1 14 1 14 4"/>
+      </svg>
+    </button>
+    <button class="toolbar-btn" onclick={onCopy} title="复制内容 (Cmd/Ctrl+Shift+C)" disabled={!hasContent}>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="5" width="8" height="9" rx="1"/>
+        <path d="M3 11V3a1 1 0 0 1 1-1h7"/>
       </svg>
     </button>
     <button class="toolbar-btn" onclick={onExportPdf} title="导出 PDF (Cmd/Ctrl+Shift+E)" disabled={!hasContent}>
