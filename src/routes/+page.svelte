@@ -131,6 +131,27 @@
     }
   }
 
+  // Refresh active tab (re-read file from disk)
+  async function refreshActiveTab() {
+    if (activeTabId) await reloadTab(activeTabId);
+  }
+
+  // Copy selected text in preview, or fall back to full markdown source
+  async function copyContent() {
+    if (!activeTab) return;
+    const selection = window.getSelection();
+    const previewEl = document.querySelector('.markdown-body');
+    const selectedText = (selection && previewEl && selection.rangeCount > 0 && previewEl.contains(selection.getRangeAt(0).commonAncestorContainer))
+      ? selection.toString()
+      : '';
+    const textToCopy = selectedText.length > 0 ? selectedText : activeTab.content;
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+    } catch (e) {
+      console.error('Copy failed:', e);
+    }
+  }
+
   // Theme management
   function applyMarkdownTheme(t: 'light' | 'dark') {
     let el = document.getElementById('github-md-theme');
@@ -306,6 +327,12 @@
     } else if (mod && e.shiftKey && (e.key === 'd' || e.key === 'D')) {
       e.preventDefault();
       exportWord();
+    } else if (mod && !e.shiftKey && e.key === 'r') {
+      e.preventDefault();
+      refreshActiveTab();
+    } else if (mod && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+      e.preventDefault();
+      copyContent();
     }
   }
 
@@ -335,6 +362,13 @@
       text: '关闭标签',
       accelerator: 'CmdOrCtrl+W',
       action: () => { if (activeTabId) closeTab(activeTabId); },
+    });
+
+    const refreshItem = await MenuItem.new({
+      id: 'refresh',
+      text: '刷新',
+      accelerator: 'CmdOrCtrl+R',
+      action: () => refreshActiveTab(),
     });
 
     const exportPdfItem = await MenuItem.new({
@@ -444,7 +478,7 @@
 
     const fileSubmenu = await Submenu.new({
       text: '文件',
-      items: [openItem, closeTabItem, exportPdfItem, exportWordItem, separator, recentSubmenu, await PredefinedMenuItem.new({ item: 'Separator' }), quitItem],
+      items: [openItem, closeTabItem, refreshItem, exportPdfItem, exportWordItem, separator, recentSubmenu, await PredefinedMenuItem.new({ item: 'Separator' }), quitItem],
     });
 
     const viewSubmenu = await Submenu.new({
@@ -511,6 +545,8 @@
     onToggleToc={toggleToc}
     onExportPdf={exportPdf}
     onExportWord={exportWord}
+    onRefresh={refreshActiveTab}
+    onCopy={copyContent}
     theme={globalTheme}
     tocVisible={activeTab?.tocVisible ?? false}
     zoom={activeTab?.zoom ?? 1.0}
