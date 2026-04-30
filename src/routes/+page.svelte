@@ -300,12 +300,63 @@
     }
   }
 
+  async function copySelectedText() {
+    const selected = window.getSelection()?.toString() ?? '';
+    const text = selected.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Fallback for environments where Clipboard API is unavailable
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', 'true');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+  }
+
+  // Right-click context menu
+  let ctxVisible = $state(false);
+  let ctxX = $state(0);
+  let ctxY = $state(0);
+  let ctxHasSel = $state(false);
+  let ctxMenuEl = $state<HTMLDivElement | undefined>(undefined);
+
+  function showContextMenu(e: MouseEvent) {
+    e.preventDefault();
+    ctxHasSel = (window.getSelection()?.toString().trim().length ?? 0) > 0;
+    ctxX = e.clientX;
+    ctxY = e.clientY;
+    ctxVisible = true;
+    requestAnimationFrame(() => {
+      if (!ctxMenuEl) return;
+      const r = ctxMenuEl.getBoundingClientRect();
+      if (ctxX + r.width > window.innerWidth) ctxX = window.innerWidth - r.width - 4;
+      if (ctxY + r.height > window.innerHeight) ctxY = window.innerHeight - r.height - 4;
+    });
+  }
+
+  function hideContextMenu() {
+    ctxVisible = false;
+  }
+
   // Keyboard shortcuts
   function handleKeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;
     if (mod && e.key === 'o') {
       e.preventDefault();
       openFileDialog();
+    } else if (mod && (e.key === 'c' || e.key === 'C')) {
+      const selected = window.getSelection()?.toString() ?? '';
+      if (selected.trim()) {
+        e.preventDefault();
+        copySelectedText();
+      }
     } else if (mod && e.shiftKey && (e.key === 't' || e.key === 'T')) {
       e.preventDefault();
       toggleTheme();
@@ -369,6 +420,13 @@
       text: '刷新',
       accelerator: 'CmdOrCtrl+R',
       action: () => refreshActiveTab(),
+    });
+
+    const copyItem = await MenuItem.new({
+      id: 'copy',
+      text: '复制',
+      accelerator: 'CmdOrCtrl+C',
+      action: () => copySelectedText(),
     });
 
     const exportPdfItem = await MenuItem.new({
@@ -481,13 +539,18 @@
       items: [openItem, closeTabItem, refreshItem, exportPdfItem, exportWordItem, separator, recentSubmenu, await PredefinedMenuItem.new({ item: 'Separator' }), quitItem],
     });
 
+    const editSubmenu = await Submenu.new({
+      text: '编辑',
+      items: [copyItem],
+    });
+
     const viewSubmenu = await Submenu.new({
       text: '视图',
       items: [themeItem, tocItem, await PredefinedMenuItem.new({ item: 'Separator' }), zoomInItem, zoomOutItem, zoomResetItem],
     });
 
     const menu = await Menu.new({
-      items: [fileSubmenu, viewSubmenu],
+      items: [fileSubmenu, editSubmenu, viewSubmenu],
     });
     await menu.setAsAppMenu();
 
@@ -532,7 +595,7 @@
   });
 </script>
 
-<svelte:window onkeydown={handleKeydown} oncontextmenu={(e) => e.preventDefault()} />
+<svelte:window onkeydown={handleKeydown} oncontextmenu={showContextMenu} onclick={hideContextMenu} />
 
 <div
   class="app-container"
@@ -576,6 +639,41 @@
   {#if isDragging}
     <div class="drop-overlay">将 Markdown 文件拖放到此处</div>
   {/if}
+
+  {#if ctxVisible}
+    <div
+      class="ctx-menu"
+      bind:this={ctxMenuEl}
+      style="left:{ctxX}px;top:{ctxY}px"
+      role="menu"
+      tabindex="-1"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.key === 'Escape' && hideContextMenu()}
+    >
+      <button class="ctx-item" role="menuitem" disabled={!ctxHasSel} onclick={() => { copySelectedText(); hideContextMenu(); }}>
+        <span class="ctx-label">复制</span>
+        <span class="ctx-shortcut">⌘C</span>
+      </button>
+      <div class="ctx-sep" role="separator"></div>
+      <button class="ctx-item" role="menuitem" disabled={!activeTab} onclick={() => { exportPdf(); hideContextMenu(); }}>
+        <span class="ctx-label">导出 PDF</span>
+        <span class="ctx-shortcut">⌘⇧E</span>
+      </button>
+      <button class="ctx-item" role="menuitem" disabled={!activeTab} onclick={() => { exportWord(); hideContextMenu(); }}>
+        <span class="ctx-label">导出 Word</span>
+        <span class="ctx-shortcut">⌘⇧D</span>
+      </button>
+      <div class="ctx-sep" role="separator"></div>
+      <button class="ctx-item" role="menuitem" onclick={() => { zoomIn(); hideContextMenu(); }}>
+        <span class="ctx-label">放大</span>
+        <span class="ctx-shortcut">⌘+</span>
+      </button>
+      <button class="ctx-item" role="menuitem" onclick={() => { zoomOut(); hideContextMenu(); }}>
+        <span class="ctx-label">缩小</span>
+        <span class="ctx-shortcut">⌘-</span>
+      </button>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -590,5 +688,59 @@
     display: flex;
     flex: 1;
     overflow: hidden;
+  }
+
+  .ctx-menu {
+    position: fixed;
+    z-index: 9999;
+    min-width: 160px;
+    background: var(--bg-primary, #fff);
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    padding: 4px 0;
+    outline: none;
+  }
+
+  .ctx-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 7px 14px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary, #111);
+    text-align: left;
+    gap: 24px;
+    white-space: nowrap;
+  }
+
+  .ctx-item:hover:not(:disabled) {
+    background: var(--accent-color, #0d6efd);
+    color: #fff;
+  }
+
+  .ctx-item:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .ctx-shortcut {
+    font-size: 11px;
+    opacity: 0.55;
+    letter-spacing: 0.02em;
+  }
+
+  .ctx-item:hover:not(:disabled) .ctx-shortcut {
+    opacity: 0.8;
+  }
+
+  .ctx-sep {
+    height: 1px;
+    background: var(--border-color, #e5e7eb);
+    margin: 4px 0;
   }
 </style>
