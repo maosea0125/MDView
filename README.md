@@ -28,6 +28,10 @@
 - **数学公式** — KaTeX 渲染，支持行内 `$...$` 和块级 `$$...$$`
 - **Mermaid 图表** — 流程图、时序图、甘特图等，支持弹窗放大查看（最高 1500%）
 - **GitHub Alerts** — 支持 `[!NOTE]` `[!TIP]` `[!IMPORTANT]` `[!WARNING]` `[!CAUTION]` 语法
+- **导出 PDF** — 一键导出当前文档为 PDF，保留样式与图表
+- **导出 Word** — 导出为 `.docx` 格式，Mermaid 图表以 PNG 嵌入文档
+- **复制文字** — 选中文本后通过快捷键或菜单复制到剪贴板
+- **右键菜单** — 预览区右键可快速访问：复制、导出 PDF、导出 Word、放大、缩小
 - **多标签页** — 同时打开多个文件，支持拖拽排序
 - **标签页右键菜单** — 关闭、关闭其他、关闭右侧、重新加载
 - **目录导航** — 自动提取标题生成侧边栏目录
@@ -46,6 +50,7 @@
 | 渲染 | [markdown-it](https://github.com/markdown-it/markdown-it) + 插件 |
 | 公式 | [KaTeX](https://katex.org/) |
 | 图表 | [Mermaid](https://mermaid.js.org/) |
+| 导出 | [JSZip](https://stuk.github.io/jszip/)（Word DOCX 生成） |
 | DOM  | [morphdom](https://github.com/patrick-steele-idem/morphdom) |
 | 样式 | [github-markdown-css](https://github.com/sindresorhus/github-markdown-css) |
 
@@ -106,6 +111,10 @@ npm run tauri build
 |--------|------|
 | `Cmd/Ctrl + O` | 打开文件 |
 | `Cmd/Ctrl + W` | 关闭当前标签 |
+| `Cmd/Ctrl + R` | 刷新当前标签 |
+| `Cmd/Ctrl + C` | 复制选中文字 |
+| `Cmd/Ctrl + Shift + E` | 导出 PDF |
+| `Cmd/Ctrl + Shift + D` | 导出 Word |
 | `Cmd/Ctrl + +` | 放大 |
 | `Cmd/Ctrl + -` | 缩小 |
 | `Cmd/Ctrl + 0` | 重置缩放 |
@@ -119,14 +128,15 @@ md-view/
 │   │   ├── components/     # Svelte 组件
 │   │   │   ├── Preview.svelte    # Markdown 预览 + Mermaid 弹窗
 │   │   │   ├── TabBar.svelte     # 标签栏
-│   │   │   ├── Toolbar.svelte    # 工具栏
+│   │   │   ├── Toolbar.svelte    # 工具栏（含导出按钮）
 │   │   │   └── TOCSidebar.svelte # 目录侧边栏
 │   │   ├── markdown/
 │   │   │   └── engine.ts         # markdown-it 引擎及插件配置
+│   │   ├── docx-export.ts        # Word DOCX 导出（JSZip + Mermaid PNG 嵌入）
 │   │   ├── types.ts              # 类型定义
 │   │   └── zoom.ts               # 缩放常量
 │   └── routes/
-│       └── +page.svelte          # 主页面 (标签管理、菜单、快捷键)
+│       └── +page.svelte          # 主页面 (标签管理、菜单、快捷键、右键菜单)
 ├── src-tauri/              # Rust 后端
 │   └── src/lib.rs          # 文件读取、文件关联处理
 ├── static/                 # 静态资源
