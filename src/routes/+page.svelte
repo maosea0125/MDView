@@ -668,7 +668,7 @@
         <span class="ctx-label">放大</span>
         <span class="ctx-shortcut">⌘+</span>
       </button>
-      <button class="ctx-item" role="menuitem" onclick={() => { zoomOut(); hideContextMenu(); }}>
+      <button class="ctx-item" role="menuitem" disabled={!activeTab || (activeTab?.zoom ?? 1.0) <= MIN_ZOOM} onclick={() => { zoomOut(); hideContextMenu(); }}>
         <span class="ctx-label">缩小</span>
         <span class="ctx-shortcut">⌘-</span>
       </button>

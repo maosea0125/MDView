@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { MIN_ZOOM, MAX_ZOOM } from '$lib/zoom';
+
   interface Props {
     fileName: string;
     onOpenFile: () => void;
@@ -34,7 +36,7 @@
   </div>
   <div class="toolbar-right">
     <div class="zoom-controls">
-      <button class="toolbar-btn" onclick={onZoomOut} title="缩小 (Cmd/Ctrl+-)">
+      <button class="toolbar-btn" onclick={onZoomOut} title="缩小 (Cmd/Ctrl+-)" disabled={zoom <= MIN_ZOOM}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="7" cy="7" r="4.5"/>
           <line x1="10.2" y1="10.2" x2="14" y2="14"/>
@@ -42,7 +44,7 @@
         </svg>
       </button>
       <button class="zoom-label" onclick={onZoomReset} title="重置缩放 (Cmd/Ctrl+0)">{zoomPercent}%</button>
-      <button class="toolbar-btn" onclick={onZoomIn} title="放大 (Cmd/Ctrl+=)">
+      <button class="toolbar-btn" onclick={onZoomIn} title="放大 (Cmd/Ctrl+=)" disabled={zoom >= MAX_ZOOM}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="7" cy="7" r="4.5"/>
           <line x1="10.2" y1="10.2" x2="14" y2="14"/>
