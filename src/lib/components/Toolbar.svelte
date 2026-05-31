@@ -1,6 +1,5 @@
 <script lang="ts">
   import { MIN_ZOOM, MAX_ZOOM } from '$lib/zoom';
-
   interface Props {
     fileName: string;
     onOpenFile: () => void;
