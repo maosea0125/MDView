@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use tauri::{Emitter, Manager};
 
 #[tauri::command]
@@ -13,17 +13,23 @@ fn get_file_name(path: String) -> String {
     PathBuf::from(&path)
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default()
+        .unwrap_or(path)
 }
 
 /// Pending file paths from file associations or CLI, waiting for frontend ready
 struct PendingFiles(Mutex<Vec<String>>);
 
+impl PendingFiles {
+    fn lock(&self) -> MutexGuard<'_, Vec<String>> {
+        // A poisoned lock only means another thread panicked mid-push; the Vec is still usable
+        self.0.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
 /// Frontend calls this to get any files that need to be opened
 #[tauri::command]
 fn get_pending_files(state: tauri::State<PendingFiles>) -> Vec<String> {
-    let mut pending = state.0.lock().unwrap();
-    pending.drain(..).collect()
+    state.lock().drain(..).collect()
 }
 
 /// Trigger the native print dialog for the current webview
@@ -32,10 +38,24 @@ fn print_page(window: tauri::WebviewWindow) -> Result<(), String> {
     window.print().map_err(|e| e.to_string())
 }
 
-/// Write binary data to a file path (used for Word/DOCX export)
+/// Write binary data to a file path (used for Word/DOCX export).
+/// The data arrives as a raw IPC body (no JSON array overhead); the target
+/// path is percent-encoded in the `path` header since headers must be ASCII.
 #[tauri::command]
-fn write_binary_file(path: String, data: Vec<u8>) -> Result<(), String> {
-    fs::write(&path, &data).map_err(|e| format!("Failed to write file: {}", e))
+fn write_binary_file(request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let path = request
+        .headers()
+        .get("path")
+        .ok_or("missing path header")?
+        .to_str()
+        .map_err(|e| e.to_string())?;
+    let path = percent_encoding::percent_decode_str(path)
+        .decode_utf8()
+        .map_err(|e| e.to_string())?;
+    let tauri::ipc::InvokeBody::Raw(data) = request.body() else {
+        return Err("expected binary body".into());
+    };
+    fs::write(path.as_ref(), data).map_err(|e| format!("Failed to write file: {}", e))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -46,13 +66,9 @@ pub fn run() {
         .manage(PendingFiles(Mutex::new(Vec::new())))
         .invoke_handler(tauri::generate_handler![read_markdown_file, get_file_name, get_pending_files, print_page, write_binary_file])
         .setup(|app| {
-            // Check if a file path was passed as CLI argument
-            let args: Vec<String> = std::env::args().collect();
-            if args.len() > 1 {
-                let path = args[1].clone();
-                let pending = app.state::<PendingFiles>();
-                pending.0.lock().unwrap().push(path);
-            }
+            // Queue any file paths passed as CLI arguments
+            let pending = app.state::<PendingFiles>();
+            pending.lock().extend(std::env::args().skip(1));
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -65,7 +81,7 @@ pub fn run() {
                         if let Some(p) = path.to_str() {
                             let _ = app.emit("open-file", p.to_string());
                             if let Some(state) = app.try_state::<PendingFiles>() {
-                                state.0.lock().unwrap().push(p.to_string());
+                                state.lock().push(p.to_string());
                             }
                         }
                     }

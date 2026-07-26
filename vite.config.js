@@ -13,6 +13,12 @@ export default defineConfig(async () => ({
     global: 'globalThis',
   },
 
+  // Pre-bundle MathJax so the lazy import during Word export doesn't trigger a
+  // mid-session dependency re-optimization (which aborts the in-flight import)
+  optimizeDeps: {
+    include: ["mathjax-full/es5/tex-svg.js"],
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

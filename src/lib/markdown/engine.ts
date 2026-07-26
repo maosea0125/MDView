@@ -142,13 +142,10 @@ export function extractToc(source: string): TocItem[] {
       const level = parseInt(tokens[i].tag.slice(1), 10);
       const inline = tokens[i + 1];
       if (inline && inline.type === 'inline') {
-        const text = inline.content;
-        const id = text
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, '-')
-          .replace(/[^\w-]/g, '');
-        toc.push({ level, text, id });
+        // The anchor plugin runs during parse and sets the final id (with -1/-2
+        // dedup suffixes for repeated headings) — read it instead of re-slugifying
+        const id = tokens[i].attrGet('id') ?? '';
+        toc.push({ level, text: inline.content, id });
       }
     }
   }

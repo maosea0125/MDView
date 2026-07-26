@@ -21,8 +21,21 @@ interface ImageData {
   heightPx: number;
 }
 
-// Module-level registry reset at the start of each export (browser is single-threaded)
+// Module-level registries reset at the start of each export (browser is single-threaded)
 let _images: ImageData[] = [];
+let _links: { id: string; url: string }[] = [];
+let _formulaErrorShown = false;
+
+// LaTeX → SVG (MathJax, isolated module loaded on demand) → PNG via the same
+// rasterizer Mermaid uses. DOM-screenshot approaches produce blank images in
+// WKWebView, hence the vector route.
+async function latexToPng(latex: string, display: boolean): Promise<ImageData> {
+  const { latexToSvg } = await import('./math-to-svg');
+  const { svg, widthPx, heightPx } = await latexToSvg(latex, display);
+  const png = await svgToPng(svg);
+  // Report half size to Word so the 2× bitmap renders at natural dimensions
+  return { bytes: png.bytes, widthPx: Math.round(widthPx / 2), heightPx: Math.round(heightPx / 2) };
+}
 
 async function svgToPng(svgString: string): Promise<ImageData> {
   return new Promise((resolve, reject) => {
@@ -61,7 +74,8 @@ async function svgToPng(svgString: string): Promise<ImageData> {
   });
 }
 
-function buildImageXml(idx: number, widthPx: number, heightPx: number): string {
+// Just the <w:r><w:drawing> run — usable inline within any paragraph
+function buildImageRunXml(idx: number, widthPx: number, heightPx: number): string {
   // Scale to fit 6-inch page width max (6" * 914400 EMU/inch = 5486400)
   const maxWidthEmu = 5486400;
   const px2emu = 9525;
@@ -74,7 +88,6 @@ function buildImageXml(idx: number, widthPx: number, heightPx: number): string {
   const relId = `rId${idx + 2}`;
   const imgName = `image${idx + 1}.png`;
   return (
-    `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="160"/></w:pPr>` +
     `<w:r><w:drawing>` +
     `<wp:inline>` +
     `<wp:extent cx="${cx}" cy="${cy}"/>` +
@@ -98,7 +111,16 @@ function buildImageXml(idx: number, widthPx: number, heightPx: number): string {
     `</pic:pic>` +
     `</a:graphicData>` +
     `</a:graphic>` +
-    `</wp:inline></w:drawing></w:r></w:p>`
+    `</wp:inline></w:drawing></w:r>`
+  );
+}
+
+// Full centered paragraph wrapper — used for block images (mermaid diagrams)
+function buildImageXml(idx: number, widthPx: number, heightPx: number): string {
+  return (
+    `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="160"/></w:pPr>` +
+    buildImageRunXml(idx, widthPx, heightPx) +
+    `</w:p>`
   );
 }
 
@@ -109,6 +131,8 @@ interface RunProps {
   italic?: boolean;
   code?: boolean;
   strike?: boolean;
+  size?: string;
+  link?: string;
 }
 
 function inlineToRuns(node: Node, rp: RunProps = {}): string {
@@ -120,8 +144,15 @@ function inlineToRuns(node: Node, rp: RunProps = {}): string {
       rp.italic ? '<w:i/><w:iCs/>' : '',
       rp.code   ? '<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/>' : '',
       rp.strike ? '<w:strike/>' : '',
+      rp.size   ? `<w:sz w:val="${rp.size}"/><w:szCs w:val="${rp.size}"/>` : '',
     ].join('');
-    return `<w:r>${pr ? `<w:rPr>${pr}</w:rPr>` : ''}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+    const rPr = pr ? `<w:rPr>${pr}</w:rPr>` : '';
+    const run = `<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+    if (!rp.link) return run;
+
+    const linkId = `link${_links.length + 1}`;
+    _links.push({ id: linkId, url: rp.link });
+    return `<w:hyperlink r:id="${linkId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${run}</w:hyperlink>`;
   }
 
   if (node.nodeType !== Node.ELEMENT_NODE) return '';
@@ -129,6 +160,24 @@ function inlineToRuns(node: Node, rp: RunProps = {}): string {
   const tag = el.tagName.toLowerCase();
 
   if (tag === 'br') return '<w:r><w:br/></w:r>';
+
+  // KaTeX formula placeholder injected during pre-processing → inline image run
+  const formulaIdx = el.getAttribute('data-docx-formula-img');
+  if (formulaIdx !== null) {
+    const idx = parseInt(formulaIdx);
+    const imgData = _images[idx];
+    return imgData ? buildImageRunXml(idx, imgData.widthPx, imgData.heightPx) : '';
+  }
+
+  // Links
+  // KaTeX renders both MathML (source) and HTML (visual). Word cannot use the
+  // HTML/CSS layout, so we fall back to showing the LaTeX source in a monospace
+  // italic run — users can paste it into Word's equation editor if needed.
+  if (tag === 'a') {
+    const href = el.getAttribute('href') ?? '';
+    if (!href) return Array.from(el.childNodes).map(n => inlineToRuns(n, rp)).join('');
+    return Array.from(el.childNodes).map(n => inlineToRuns(n, { ...rp, link: href })).join('');
+  }
 
   const next: RunProps = { ...rp };
   if (tag === 'strong' || tag === 'b') next.bold = true;
@@ -150,14 +199,13 @@ function blockToXml(el: Element, listLevel = 0): string {
     const lvl = hMatch[1];
     const sz: Record<string, string> = { '1':'48','2':'36','3':'28','4':'24','5':'22','6':'20' };
     const sp: Record<string, string> = { '1':'400','2':'320','3':'280','4':'240','5':'200','6':'160' };
-    const runs = Array.from(el.childNodes).map(n => inlineToRuns(n, { bold: true })).join('');
+    const runs = Array.from(el.childNodes).map(n => inlineToRuns(n, { bold: true, size: sz[lvl] })).join('');
     return (
       `<w:p>` +
         `<w:pPr><w:pStyle w:val="Heading${lvl}"/>` +
           `<w:spacing w:before="${sp[lvl]}" w:after="120"/>` +
         `</w:pPr>` +
-        `<w:r><w:rPr><w:b/><w:sz w:val="${sz[lvl]}"/><w:szCs w:val="${sz[lvl]}"/></w:rPr>` +
-          `<w:t xml:space="preserve">${escapeXml(el.textContent ?? '')}</w:t></w:r>` +
+        runs +
       `</w:p>`
     );
   }
@@ -217,7 +265,7 @@ function blockToXml(el: Element, listLevel = 0): string {
   // Table
   if (tag === 'table') return tableToXml(el);
 
-  // Div / section — recurse children; handle mermaid markers
+  // Div / section — recurse children; handle mermaid and formula image markers
   if (tag === 'div' || tag === 'section' || tag === 'article' || tag === 'main') {
     // Mermaid placeholder injected during pre-processing
     const imgIdx = el.getAttribute('data-docx-img');
@@ -314,6 +362,8 @@ function tableToXml(table: Element): string {
  */
 export async function htmlToDocxBytes(htmlContent: string): Promise<Uint8Array> {
   _images = [];
+  _links = [];
+  _formulaErrorShown = false;
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, 'text/html');
@@ -341,6 +391,41 @@ export async function htmlToDocxBytes(htmlContent: string): Promise<Uint8Array> 
       const p = doc.createElement('p');
       p.textContent = '[Mermaid Diagram]';
       container.replaceWith(p);
+    }
+  }
+
+  // Pre-process: replace KaTeX formulas with image markers.
+  // The LaTeX source is embedded in each formula's <annotation> element;
+  // MathJax re-renders it as a standalone SVG which we rasterize to PNG.
+  const docFormulas = Array.from(doc.querySelectorAll('.katex-display, .katex')).filter(
+    el => el.classList.contains('katex-display') || !el.closest('.katex-display')
+  );
+  for (const target of docFormulas) {
+    const display = target.classList.contains('katex-display');
+    const latex = target
+      .querySelector('annotation[encoding="application/x-tex"]')
+      ?.textContent?.trim();
+    let replaced = false;
+    if (latex) {
+      try {
+        const png = await latexToPng(latex, display);
+        const idx = _images.length;
+        _images.push(png);
+        const marker = doc.createElement('span');
+        marker.setAttribute('data-docx-formula-img', String(idx));
+        target.replaceWith(marker);
+        replaced = true;
+      } catch (e) {
+        console.error('Formula render failed, falling back to LaTeX source:', e);
+        // Surface the first failure so it doesn't silently degrade every formula
+        if (!_formulaErrorShown) {
+          _formulaErrorShown = true;
+          alert(`公式转图片失败，将以 LaTeX 源码导出。\n错误详情：${e}`);
+        }
+      }
+    }
+    if (!replaced) {
+      target.replaceWith(doc.createTextNode(latex ?? target.textContent ?? ''));
     }
   }
 
@@ -386,8 +471,13 @@ export async function htmlToDocxBytes(htmlContent: string): Promise<Uint8Array> 
     `Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" ` +
     `Target="media/image${i + 1}.png"/>`
   ).join('\n');
+  const linkRels = _links.map((l) =>
+    `  <Relationship Id="${l.id}" ` +
+    `Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" ` +
+    `Target="${escapeXml(l.url)}" TargetMode="External"/>`
+  ).join('\n');
   const docRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${imageRels ? '\n' + imageRels : ''}
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${imageRels ? '\n' + imageRels : ''}${linkRels ? '\n' + linkRels : ''}
 </Relationships>`;
 
   const zip = new JSZip();

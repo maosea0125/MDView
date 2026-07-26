@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { renderMarkdown, extractToc, type TocItem, type RenderResult } from '$lib/markdown/engine';
   import Toolbar from '$lib/components/Toolbar.svelte';
   import Preview from '$lib/components/Preview.svelte';
@@ -125,9 +125,11 @@
     try {
       const content: string = await invoke('read_markdown_file', { path: tab.filePath });
       const rendered = renderMarkdown(content);
-      tabs = tabs.map(t => t.id === id ? { ...t, content, rendered } : t) as typeof tabs;
+      const tocItems = extractToc(content);
+      tabs = tabs.map(t => t.id === id ? { ...t, content, rendered, tocItems } : t) as typeof tabs;
     } catch (e) {
       console.error('Failed to reload file:', e);
+      alert(`刷新文件失败：${e}`);
     }
   }
 
@@ -197,6 +199,12 @@
     rebuildRecentMenu();
   }
 
+  function removeRecentFile(path: string) {
+    const recent = getRecentFiles().filter(p => p !== path);
+    localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(recent));
+    rebuildRecentMenu();
+  }
+
   function clearRecentFiles() {
     localStorage.removeItem(RECENT_FILES_KEY);
     rebuildRecentMenu();
@@ -223,6 +231,8 @@
       addRecentFile(path);
     } catch (e) {
       console.error('Failed to load file:', e);
+      removeRecentFile(path);
+      alert(`打开文件失败：${e}`);
     }
   }
 
@@ -244,13 +254,16 @@
     }
   }
 
+  // Document title for exports: first H1, falling back to file name without extension
+  function exportTitle(tab: Tab): string {
+    const h1Match = tab.content.match(/^#\s+(.+)/m);
+    return h1Match ? h1Match[1].trim() : tab.fileName.replace(/\.[^.]+$/, '');
+  }
+
   // PDF export
   async function exportPdf() {
     if (!activeTab) return;
-    const h1Match = activeTab.content.match(/^#\s+(.+)/m);
-    const pdfTitle = h1Match
-      ? h1Match[1].trim()
-      : activeTab.fileName.replace(/\.[^.]+$/, '');
+    const pdfTitle = exportTitle(activeTab);
 
     const markdownBody = document.querySelector('.markdown-body') as HTMLElement | null;
     const prevFontSize = markdownBody?.style.fontSize ?? '';
@@ -272,10 +285,7 @@
   // Word export
   async function exportWord() {
     if (!activeTab) return;
-    const h1Match = activeTab.content.match(/^#\s+(.+)/m);
-    const docTitle = h1Match
-      ? h1Match[1].trim()
-      : activeTab.fileName.replace(/\.[^.]+$/, '');
+    const docTitle = exportTitle(activeTab);
 
     // Open save dialog first
     const { save } = await import('@tauri-apps/plugin-dialog');
@@ -293,7 +303,8 @@
 
       const { htmlToDocxBytes } = await import('$lib/docx-export');
       const bytes = await htmlToDocxBytes(markdownBody.innerHTML);
-      await invoke('write_binary_file', { path: savePath, data: Array.from(bytes) });
+      // Raw-body invoke: bytes go over IPC untouched; path rides in a header (ASCII-only, hence encoded)
+      await invoke('write_binary_file', bytes, { headers: { path: encodeURIComponent(savePath) } });
     } catch (err) {
       console.error('Word export failed:', err);
       alert(`导出失败：${err}`);
@@ -386,6 +397,9 @@
       copyContent();
     }
   }
+
+  let unlistenOpenFile: (() => void) | undefined;
+  onDestroy(() => unlistenOpenFile?.());
 
   onMount(async () => {
     // Restore theme
@@ -555,7 +569,7 @@
     await menu.setAsAppMenu();
 
     // Listen for file open from Rust (file association while app is running)
-    listen<string>('open-file', (event) => {
+    unlistenOpenFile = await listen<string>('open-file', (event) => {
       loadFile(event.payload);
     });
 

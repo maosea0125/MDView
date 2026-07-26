@@ -10,7 +10,8 @@
   }
 
   let { html, hasMermaid, zoom, onZoomChange }: Props = $props();
-  let previewEl: HTMLDivElement;
+  // Bound to an <article>, so HTMLElement (HTMLDivElement breaks morphdom's typing)
+  let previewEl: HTMLElement;
   let wrapperEl: HTMLDivElement;
   let mermaidLoaded = false;
 
@@ -242,9 +243,9 @@
 </div>
 
 {#if modalVisible}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div class="mermaid-modal-overlay" onclick={closeModal}>
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="mermaid-modal" onclick={(e) => e.stopPropagation()}>
       <div class="mermaid-modal-toolbar">
         <button class="modal-zoom-btn" onclick={modalZoomOut} title="缩小">

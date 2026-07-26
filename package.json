@@ -28,6 +28,7 @@
     "markdown-it-front-matter": "^0.2.4",
     "markdown-it-task-lists": "^2.1.1",
     "markdown-it-texmath": "^1.0.0",
+    "mathjax-full": "^3.2.1",
     "mermaid": "^11.14.0",
     "morphdom": "^2.7.8"
   },
