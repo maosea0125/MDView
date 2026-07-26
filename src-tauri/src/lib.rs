@@ -63,6 +63,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(PendingFiles(Mutex::new(Vec::new())))
         .invoke_handler(tauri::generate_handler![read_markdown_file, get_file_name, get_pending_files, print_page, write_binary_file])
         .setup(|app| {

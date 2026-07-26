@@ -105,6 +105,14 @@ npm run tauri build
 
 构建产物位于 `src-tauri/target/release/bundle/`。
 
+### 发布与应用内更新
+
+推送 `v*` tag 触发 CI 构建，产物包含各平台安装包、更新包（`.sig` 签名文件）与 `latest.json`。注意事项：
+
+- CI 创建的是 **draft release**，必须人工 publish 后，客户端才能通过 `latest.json` 检测到新版本。
+- 应用内更新功能自带该功能的版本起生效；更早版本的用户需手动下载安装一次。
+- 更新包使用 minisign 密钥签名，CI 依赖 GitHub Secrets：`TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。私钥务必离线备份——丢失后已发布版本将无法再自动更新。
+
 ## 快捷键
 
 | 快捷键 | 功能 |

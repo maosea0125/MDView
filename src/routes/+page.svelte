@@ -7,6 +7,8 @@
   import Preview from '$lib/components/Preview.svelte';
   import TOCSidebar from '$lib/components/TOCSidebar.svelte';
   import TabBar from '$lib/components/TabBar.svelte';
+  import AboutDialog from '$lib/components/AboutDialog.svelte';
+  import { updateState, checkForUpdate } from '$lib/update.svelte';
   import type { Tab } from '$lib/types';
   import { MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, clampZoom } from '$lib/zoom';
   import lightMdCss from 'github-markdown-css/github-markdown-light.css?inline';
@@ -17,6 +19,9 @@
   let activeTabId = $state('');
   let globalTheme = $state<'light' | 'dark'>('light');
   let isDragging = $state(false);
+  let aboutVisible = $state(false);
+  // 启动静默检查发现新版本时的非模态提示；用户忽略后本次会话不再出现
+  let updateBannerDismissed = $state(false);
 
   // Derived: active tab
   let activeTab = $derived(tabs.find(t => t.id === activeTabId));
@@ -498,6 +503,12 @@
       action: () => resetZoom(),
     });
 
+    const aboutItem = await MenuItem.new({
+      id: 'about',
+      text: '关于 MDView',
+      action: () => { aboutVisible = true; },
+    });
+
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
 
     const quitItem = await MenuItem.new({
@@ -550,7 +561,7 @@
 
     const fileSubmenu = await Submenu.new({
       text: '文件',
-      items: [openItem, closeTabItem, refreshItem, exportPdfItem, exportWordItem, separator, recentSubmenu, await PredefinedMenuItem.new({ item: 'Separator' }), quitItem],
+      items: [openItem, closeTabItem, refreshItem, exportPdfItem, exportWordItem, separator, recentSubmenu, await PredefinedMenuItem.new({ item: 'Separator' }), aboutItem, quitItem],
     });
 
     const editSubmenu = await Submenu.new({
@@ -606,6 +617,9 @@
         setGlobalTheme(e.matches ? 'dark' : 'light');
       }
     });
+
+    // 启动后静默检查一次更新（无更新或失败均不打扰）
+    checkForUpdate(true);
   });
 </script>
 
@@ -652,6 +666,18 @@
 
   {#if isDragging}
     <div class="drop-overlay">将 Markdown 文件拖放到此处</div>
+  {/if}
+
+  {#if updateState.status === 'available' && !aboutVisible && !updateBannerDismissed}
+    <div class="update-banner" role="status">
+      <span>发现新版本 {updateState.version}</span>
+      <button class="banner-btn primary" onclick={() => { updateBannerDismissed = true; aboutVisible = true; }}>查看更新</button>
+      <button class="banner-btn" onclick={() => { updateBannerDismissed = true; }}>忽略</button>
+    </div>
+  {/if}
+
+  {#if aboutVisible}
+    <AboutDialog onClose={() => { aboutVisible = false; }} />
   {/if}
 
   {#if ctxVisible}
@@ -756,5 +782,42 @@
     height: 1px;
     background: var(--border-color, #e5e7eb);
     margin: 4px 0;
+  }
+
+  .update-banner {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text-primary, #111);
+    background: var(--bg-primary, #fff);
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  }
+
+  .banner-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    border: 1px solid var(--border-color, #d1d5db);
+    background: var(--bg-primary, #fff);
+    color: var(--text-primary, #111);
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .banner-btn:hover {
+    background: var(--hover-bg, #f3f4f6);
+  }
+
+  .banner-btn.primary {
+    background: var(--accent-color, #0d6efd);
+    border-color: var(--accent-color, #0d6efd);
+    color: #fff;
   }
 </style>

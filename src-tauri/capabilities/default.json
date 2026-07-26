@@ -12,6 +12,8 @@
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save",
-    "core:menu:default"
+    "core:menu:default",
+    "updater:default",
+    "process:allow-restart"
   ]
 }
