@@ -195,11 +195,47 @@
       onZoomChange(newZoom);
     }
   }
+
+  const OPEN_PROTOCOLS = ['http:', 'https:', 'mailto:'];
+
+  function handleLinkClick(e: MouseEvent) {
+    const link = (e.target as HTMLElement).closest('a');
+    if (!link) return;
+    e.preventDefault();
+
+    const href = link.getAttribute('href') ?? '';
+    if (href.startsWith('#')) {
+      let id = href.slice(1);
+      try {
+        id = decodeURIComponent(id);
+      } catch {}
+      const target = previewEl?.querySelector(`[id="${CSS.escape(id)}"]`);
+      target?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    // Parse the raw href without a base URL: relative paths throw and stay blocked,
+    // instead of resolving to http://<dev-server>/... and slipping through the whitelist
+    let url: URL;
+    try {
+      url = new URL(href);
+    } catch {
+      return;
+    }
+    if (!OPEN_PROTOCOLS.includes(url.protocol)) return;
+
+    import('@tauri-apps/plugin-opener')
+      .then(({ openUrl }) => openUrl(url.href))
+      .catch(() => {
+        window.open(url.href, '_blank');
+      });
+  }
 </script>
 
 <svelte:window onkeydown={handleModalKeydown} />
 
-<div class="preview-wrapper" bind:this={wrapperEl} onwheel={handleWheel}>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div class="preview-wrapper" bind:this={wrapperEl} onwheel={handleWheel} onclick={handleLinkClick}>
   <article class="markdown-body" bind:this={previewEl} style="font-size: {zoom * BASE_FONT_SIZE}px">
     <!-- Content injected via morphdom -->
   </article>

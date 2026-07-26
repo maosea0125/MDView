@@ -14,6 +14,8 @@ This is **bold**, *italic*, ~~strikethrough~~, and `inline code`.
 
 This is a [link](https://example.com) and an auto-linked URL: https://example.com
 
+Link tests: [mailto link](mailto:test@example.com), [relative link](./other.md), [anchor link](#footnotes)
+
 ## Task Lists
 
 - [x] Completed task
