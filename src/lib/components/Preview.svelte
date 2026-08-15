@@ -293,8 +293,9 @@
   }
 
   .markdown-body {
-    max-width: 900px;
-    margin: 0 auto;
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
     padding: 0 16px 48px;
   }
 
