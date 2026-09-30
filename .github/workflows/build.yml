@@ -16,6 +16,9 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
+            args: --target aarch64-apple-darwin
+            rust_target: aarch64-apple-darwin
+          - platform: macos-latest
             args: --target x86_64-apple-darwin
             rust_target: x86_64-apple-darwin
           - platform: windows-latest
@@ -58,8 +61,18 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'MDView ${{ github.ref_name }}'
-          releaseBody: 'MDView ${{ github.ref_name }} release'
+          releaseBody: |
+            MDView ${{ github.ref_name }}
+
+            macOS 分别提供 Apple Silicon（aarch64）和 Intel（x64）安装包，请按芯片选择。
+            Apple Silicon 上安装了旧 Intel 版本的用户，请在升级 macOS 28 前退出 MDView，下载 aarch64 DMG 并替换 /Applications 中的应用。
+            应用内更新不会自动切换架构。已升级 macOS 28 且无法启动旧版本的用户，请直接手动安装 aarch64 包。
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+      - name: Verify macOS bundle architecture
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/verify-macos-architecture.sh "src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/MDView.app" "${{ matrix.rust_target }}"

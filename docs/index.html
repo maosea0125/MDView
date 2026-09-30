@@ -509,7 +509,7 @@
         <div class="platform-card">
           <div class="platform-icon">🍎</div>
           <h3>macOS</h3>
-          <p class="arch">Apple Silicon</p>
+          <p class="arch">Apple Silicon · aarch64.dmg</p>
           <a class="btn btn-primary" href="https://github.com/maosea0125/MDView/releases/latest">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
@@ -520,7 +520,7 @@
         <div class="platform-card">
           <div class="platform-icon">🍎</div>
           <h3>macOS</h3>
-          <p class="arch">Intel x86_64</p>
+          <p class="arch">Intel · x64.dmg</p>
           <a class="btn btn-primary" href="https://github.com/maosea0125/MDView/releases/latest">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
@@ -542,6 +542,11 @@
       </div>
 
       <p style="margin-top: 32px; color: var(--text-muted); font-size: 13px;">
+        Apple Silicon（M 系列）请选择 aarch64 安装包，Intel Mac 请选择 x64 安装包。
+        Apple Silicon 上的旧 Intel 版本需在升级 macOS 28 前退出应用，下载 aarch64 DMG 并替换 /Applications 中的 MDView。
+        应用内更新不会自动切换架构；若升级后旧版本无法启动，请直接手动安装 aarch64 包。
+      </p>
+      <p style="margin-top: 16px; color: var(--text-muted); font-size: 13px;">
         macOS 首次打开可能需要在「系统设置 → 隐私与安全性」中允许打开
       </p>
     </div>
