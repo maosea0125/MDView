@@ -68,6 +68,10 @@
 
 ### macOS
 
+Apple Silicon（M 系列芯片）请选择文件名包含 `aarch64` 的 `.dmg`；Intel Mac 请选择包含 `x64` 的 `.dmg`。两种安装包独立发布。
+
+Apple Silicon 上使用旧 Intel 版本的用户，请在升级 macOS 28 前退出 MDView，打开 `aarch64` DMG，将其中的 MDView 拖入 `/Applications` 并替换旧应用，再重新打开原 Markdown 文件。应用内更新按当前应用架构匹配，不会自动切换到 arm64。若已升级 macOS 28 导致旧版本无法启动，请直接手动安装 `aarch64` 包。
+
 ```bash
 # 或通过命令行安装 DMG 中的 app
 cp -R /Volumes/MDView/MDView.app /Applications/
@@ -105,6 +109,16 @@ npm run tauri build
 
 构建产物位于 `src-tauri/target/release/bundle/`。
 
+macOS 发布时显式指定架构：
+
+```bash
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+npm run tauri build -- --target aarch64-apple-darwin
+npm run tauri build -- --target x86_64-apple-darwin
+```
+
+对应产物分别位于 `src-tauri/target/aarch64-apple-darwin/release/bundle/` 和 `src-tauri/target/x86_64-apple-darwin/release/bundle/`。可使用 `bash scripts/verify-macos-architecture.sh <MDView.app路径> <Rust target>` 校验应用包实际架构。
+
 ### 发布与应用内更新
 
 推送 `v*` tag 触发 CI 构建，产物包含各平台安装包、更新包（`.sig` 签名文件）与 `latest.json`。注意事项：
@@ -112,6 +126,7 @@ npm run tauri build
 - CI 创建的是 **draft release**，必须人工 publish 后，客户端才能通过 `latest.json` 检测到新版本。
 - 应用内更新功能自带该功能的版本起生效；更早版本的用户需手动下载安装一次。
 - 更新包使用 minisign 密钥签名，CI 依赖 GitHub Secrets：`TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。私钥务必离线备份——丢失后已发布版本将无法再自动更新。
+- 发布前确认三个构建任务均成功，`latest.json` 同时包含 `darwin-aarch64`、`darwin-x86_64` 和 Windows 平台条目，且 URL、签名和更新包架构对应。失败的 draft release 不得发布。
 
 ## 快捷键
 
