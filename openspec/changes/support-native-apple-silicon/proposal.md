@@ -9,6 +9,7 @@ Apple 将通用 Rosetta 支持保留至 macOS 27，macOS 28 上普通 Intel 应�
 - 按用户选择，分别发布 `aarch64-apple-darwin` 和 `x86_64-apple-darwin` 安装包，保留 Intel 与 Windows 支持。
 - 为两种 macOS 架构生成匹配的签名更新包及 `latest.json` 平台条目。
 - 验证发布包中的 Mach-O 架构，确保 Apple Silicon 包可原生运行。
+- 为 macOS 应用包配置 ad-hoc 签名并在 CI 中校验签名，避免 arm64 包从浏览器下载后被 Gatekeeper 判为签名无效。
 - 更新 README 和下载页，明确安装包选择与 Apple Silicon 上旧 Intel 版本的手动迁移步骤。
 - 在 Apple Silicon 上验证文件打开、预览、导出及更新流程，记录原生运行证据。
 
@@ -24,7 +25,8 @@ Apple 将通用 Rosetta 支持保留至 macOS 27，macOS 28 上普通 Intel 应�
 
 ## 影响
 
-- `.github/workflows/build.yml`：新增 arm64 构建与产物验证。
+- `.github/workflows/build.yml`：新增 arm64 构建、产物架构与签名校验，以及 `latest.json` 平台条目检查。
+- `src-tauri/tauri.conf.json`：macOS 应用包改用 ad-hoc 签名。
 - `README.md`、`docs/index.html`：安装、构建和迁移说明。
 - GitHub Releases：新增 arm64 安装包及更新包；继续复用已有签名密钥、公钥和更新源。
 - 预计无需调整业务代码或升级依赖；实际构建若发现原生依赖问题，再根据证据处理。
