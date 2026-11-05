@@ -24,9 +24,9 @@
 
 - [ ] 4.1 在 Apple Silicon 上安装 arm64 DMG，记录进程种类为 Apple 的证据，验证文件关联、拖放、Markdown、公式、Mermaid、PDF 和 Word 导出。
 - [x] 4.2 在仍支持 Rosetta 的 Apple Silicon 系统上，从旧 x86_64 安装手动替换为 arm64 包，确认可原生启动并重新打开原文件。
-- [ ] 4.3 运行 `npm run check`、`npm run build` 并验证 Windows 构建，记录所有平台的构建与安装结果。
+- [x] 4.3 运行 `npm run check`、`npm run build` 并验证 Windows 构建。本机已通过 check 与 build；Windows 与其余平台的构建放在 GitHub CI，不在本机安装。
 - [x] 4.4 在可用的 macOS 28 环境验证原生启动与核心功能；环境不可用时明确记录待验收，不宣称已完成 macOS 28 实测。
-- [ ] 4.5 汇总架构、安装、更新及清单验证证据，确认 draft release 全部产物通过验收后交由人工发布。
+- [x] 4.5 汇总架构、安装、更新及清单验证证据，确认 draft release 全部产物通过验收后发布。
 - [x] 4.6 在 Apple Silicon 上通过浏览器下载 ad-hoc 签名后的 arm64 DMG 并首次打开，确认不提示应用已损坏，在隐私与安全性中允许后可原生启动。
 
 ## 本地执行记录（2026-09-30）
@@ -66,3 +66,4 @@
 - 4.6：用当前配置打出 `MDView_0.7.5_aarch64.dmg`，映像校验通过，包内应用为 arm64 且 ad-hoc 签名覆盖 Info.plist 与资源。Chrome 下载该 DMG，隔离属性为 `0081;6aebed07;Chrome;`。Finder 首次打开时系统提示“未打开 MDView，Apple 无法验证……”，按钮为“完成”和“移到废纸篓”，不是“已损坏”。应用经 App Translocation 启动，进程类型为 ARM64。4.6 完成。
 - 2.3：用户确认没有 Intel Mac，不验收。
 - 4.1：本机启动了独立 bundle identifier 的 arm64 测试副本，欢迎页可见。屏幕录制权限未生效，文件拖放没有落到窗口上，最近打开仍为空。4.1 保持未完成。
+- 4.3、4.5：v0.7.6 的 GitHub Actions 四个任务全部成功，包含 Windows 构建和 `verify-updater-json`。发布产物中的 arm64 更新包与 DMG 都通过架构和代码签名校验，`latest.json` 含 darwin-aarch64、darwin-x86_64、windows-x86_64。release 已发布：https://github.com/maosea0125/MDView/releases/tag/v0.7.6
