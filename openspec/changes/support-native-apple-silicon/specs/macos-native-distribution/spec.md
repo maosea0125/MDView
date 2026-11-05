@@ -26,6 +26,10 @@
 - **WHEN** x86_64 客户端在可运行该版本的 macOS 上安装更新
 - **THEN** 下载 x86_64 更新包且签名验证通过，Intel Mac 用户可继续使用
 
+#### Scenario: 清单缺项
+- **WHEN** draft release 的 `latest.json` 缺少 `darwin-aarch64` 或 `darwin-x86_64` 条目
+- **THEN** 发布 workflow 失败，该 draft release 不得发布
+
 ### Requirement: 安装选择和旧版本迁移说明
 README、下载页及首次双架构发布说明 MUST 清楚区分 Apple Silicon 与 Intel 安装包，并说明 Apple Silicon 上旧 x86_64 安装需在升级 macOS 28 前手动替换为 arm64 包。说明 MUST 告知用户常规应用内更新不会自动切换架构。
 
@@ -39,3 +43,14 @@ README、下载页及首次双架构发布说明 MUST 清楚区分 Apple Silicon
 #### Scenario: 架构不匹配
 - **WHEN** arm64 构建的应用主程序或随包运行依赖仅包含 x86_64
 - **THEN** 架构校验失败，该构建不得通过发布验收
+
+### Requirement: macOS 应用包签名
+每个 macOS 应用包 MUST 带有覆盖主程序、Info.plist 与资源的有效代码签名；未使用 Apple 开发者证书时 SHALL 使用 ad-hoc 签名。发布流程 MUST 校验应用包签名，签名无效时 MUST 将该构建标记为失败。
+
+#### Scenario: 浏览器下载安装
+- **WHEN** Apple Silicon 用户通过浏览器下载 arm64 DMG 并首次打开 MDView
+- **THEN** 系统按未公证应用处理，用户在隐私与安全性中允许后可原生启动，不会提示应用已损坏
+
+#### Scenario: 签名无效
+- **WHEN** 应用包只有链接器生成的签名，或签名未覆盖 Info.plist 与资源
+- **THEN** 签名校验失败，该构建不得通过发布验收

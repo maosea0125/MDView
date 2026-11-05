@@ -48,6 +48,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+          key: ${{ matrix.rust_target }}
 
       - name: Install dependencies (npm)
         run: npm ci
@@ -76,3 +77,16 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: bash scripts/verify-macos-architecture.sh "src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/MDView.app" "${{ matrix.rust_target }}"
+
+  verify-updater-json:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify latest.json platforms
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json
+          jq '.platforms | keys' latest.json
+          jq -e '.platforms | has("darwin-aarch64") and has("darwin-x86_64") and has("windows-x86_64")' latest.json

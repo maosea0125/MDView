@@ -2,19 +2,23 @@
 
 - [x] 1.1 在 `.github/workflows/build.yml` 新增 `aarch64-apple-darwin` 矩阵条目，安装对应 Rust target，保留 x86_64 和 Windows 构建。
 - [x] 1.2 增加 macOS 最终 `.app` 的架构验证，通过 Info.plist 定位主程序并检查包内 Mach-O 文件；实际架构不匹配时构建失败。
-- [ ] 1.3 构建两种 macOS 目标，确认 DMG、更新压缩包及 `.sig` 文件名称区分架构且无上传覆盖，记录部署目标。
+- [x] 1.3 构建两种 macOS 目标，确认 DMG、更新压缩包及 `.sig` 文件名称区分架构且无上传覆盖，记录部署目标。
+- [x] 1.4 macOS 应用包改用 ad-hoc 签名（`signingIdentity: "-"`），校验脚本用 `codesign --verify --deep --strict` 检查整个应用包签名，签名无效时构建失败。
+- [x] 1.5 Rust 缓存 key 按 `matrix.rust_target` 区分，避免两个 macOS 任务争用同一份缓存。
 
 ## 2. 更新清单验证
 
-- [ ] 2.1 验证 draft release 最终 `latest.json` 同时包含 `darwin-aarch64`、`darwin-x86_64` 与原 Windows 条目，URL 和签名对应实际产物；如有覆盖则调整为构建完成后汇总。
+- [x] 2.1 验证 draft release 最终 `latest.json` 同时包含 `darwin-aarch64`、`darwin-x86_64` 与原 Windows 条目，URL 和签名对应实际产物；如有覆盖则调整为构建完成后汇总。
 - [x] 2.2 使用两个不同版本的 arm64 客户端完成签名更新及重启验收，确认更新前后均为原生 Apple 进程。
-- [ ] 2.3 在 Intel Mac 验证 x86_64 安装与签名更新，确认现有更新公钥、更新源及功能正常。
+- [x] 2.3 在 Intel Mac 验证 x86_64 安装与签名更新。用户确认没有 Intel 机器，本项不验收。
+- [x] 2.4 新增依赖全部构建任务的 `verify-updater-json` 任务，检查 `latest.json` 包含 `darwin-aarch64`、`darwin-x86_64` 与 `windows-x86_64` 条目，缺项时 workflow 失败。
 
 ## 3. 下载与迁移说明
 
 - [x] 3.1 更新 README，添加双架构构建命令、产物路径、安装包选择与旧 x86_64 安装手动替换为 arm64 的步骤。
-- [ ] 3.2 更新 `docs/index.html` 下载区域的架构识别及迁移说明，明确应用内更新不会自动切换架构，检查桌面与移动端文字布局。
+- [x] 3.2 更新 `docs/index.html` 下载区域的架构识别及迁移说明，明确应用内更新不会自动切换架构，检查桌面与移动端文字布局。
 - [x] 3.3 将同样的迁移提示加入首次双架构发布说明，提醒用户在升级 macOS 28 前迁移，并说明已升级系统的手动安装路径。
+- [x] 3.4 README 补充 0.7.5 `aarch64` 安装包提示"已损坏"时的临时处理方式，发布前检查改为以 workflow 全部任务成功为准。
 
 ## 4. 原生运行与发布验收
 
@@ -23,6 +27,7 @@
 - [ ] 4.3 运行 `npm run check`、`npm run build` 并验证 Windows 构建，记录所有平台的构建与安装结果。
 - [x] 4.4 在可用的 macOS 28 环境验证原生启动与核心功能；环境不可用时明确记录待验收，不宣称已完成 macOS 28 实测。
 - [ ] 4.5 汇总架构、安装、更新及清单验证证据，确认 draft release 全部产物通过验收后交由人工发布。
+- [x] 4.6 在 Apple Silicon 上通过浏览器下载 ad-hoc 签名后的 arm64 DMG 并首次打开，确认不提示应用已损坏，在隐私与安全性中允许后可原生启动。
 
 ## 本地执行记录（2026-09-30）
 
@@ -46,3 +51,18 @@
 - 重启后的原生 UI 工具无法重新绑定测试窗口；重启证据来自进程路径、架构采样、安装版本和更新服务请求，未声称完成重启后的 UI 回归。
 - 临时 HTTP 更新服务已停止，两种验收 DMG 已卸载。测试配置和临时密钥均位于被忽略的 `src-tauri/target/`，未修改正式 updater 公钥、端点或安全配置。
 - 剩余：1.3 的双架构更新产物与实际上传不覆盖、2.1 的最终发布清单、2.3 的 Intel 实机更新、3.2 的桌面/移动端视觉检查、4.1 的拖放、4.3 的 Windows 构建安装，以及 4.5 的正式发布验收。macOS 28 实机测试仍待环境可用。
+
+## 发布后核验与修复（2026-11-05）
+
+- v0.7.5 正式发布共 11 个资源，DMG、更新包及 `.sig` 均按架构命名且没有覆盖；CI 二进制部署目标 arm64 为 11.0、x86_64 为 10.15。1.3 完成。
+- 正式 `latest.json` 含 `darwin-aarch64`、`darwin-x86_64` 与 Windows 条目，URL 指向对应资源，签名与同名 `.sig` 一致；两个 macOS 更新包经正式公钥（key id `D2889BD1070CF02E`）minisign 验签通过。三个任务上传清单的间隔约 95 秒，本次未发生覆盖。2.1 完成。
+- v0.7.5 的 arm64 包只有链接器签名，`codesign --verify --strict` 与 Gatekeeper 都判定签名无效。改为 ad-hoc 签名后，本机 arm64 构建（跳过前端构建与 updater 产物）的签名覆盖 Info.plist 与资源，Gatekeeper 恢复为普通拒绝；新校验脚本对旧包失败、对 ad-hoc 签名包通过。x64 产物待 CI 验证，浏览器下载场景见 4.6。
+- v0.7.5 CI 中两个 macOS 任务的 Rust 缓存 key 相同，x86_64 任务保存缓存失败（1.5）。`verify-updater-json` 的检查脚本在本机运行时，v0.7.5 清单通过，去掉 `darwin-aarch64` 后失败（2.4）。1.4、1.5、2.4 的 CI 效果待下次发布确认。
+
+## 继续实施（2026-11-05）
+
+- 3.2：下载页文字已在仓库中。桌面宽度下三张卡片横排，迁移说明自动换行，没有横向溢出。手机宽度下卡片改为单列，架构名称和说明文字都在容器内换行，没有溢出。3.2 完成。
+- 4.3 的本机部分：`npm ci` 后 `npm run check` 为 0 errors、0 warnings；`npm run build` 在 Tauri 构建中成功。没有 Windows 环境，Windows 构建与安装仍未验证，4.3 保持未完成。
+- 4.6：用当前配置打出 `MDView_0.7.5_aarch64.dmg`，映像校验通过，包内应用为 arm64 且 ad-hoc 签名覆盖 Info.plist 与资源。Chrome 下载该 DMG，隔离属性为 `0081;6aebed07;Chrome;`。Finder 首次打开时系统提示“未打开 MDView，Apple 无法验证……”，按钮为“完成”和“移到废纸篓”，不是“已损坏”。应用经 App Translocation 启动，进程类型为 ARM64。4.6 完成。
+- 2.3：用户确认没有 Intel Mac，不验收。
+- 4.1：本机启动了独立 bundle identifier 的 arm64 测试副本，欢迎页可见。屏幕录制权限未生效，文件拖放没有落到窗口上，最近打开仍为空。4.1 保持未完成。

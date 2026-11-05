@@ -78,6 +78,8 @@ cp -R /Volumes/MDView/MDView.app /Applications/
 ```
 
 > macOS 首次打开可能提示"无法验证开发者"，请在 **系统设置 → 隐私与安全性** 中允许打开。
+>
+> 0.7.5 的 `aarch64` 安装包签名不完整，若打开时提示"已损坏，无法打开"，请在终端执行 `xattr -dr com.apple.quarantine /Applications/MDView.app` 后重新打开。其他版本不受影响。
 
 ### Windows
 
@@ -117,7 +119,7 @@ npm run tauri build -- --target aarch64-apple-darwin
 npm run tauri build -- --target x86_64-apple-darwin
 ```
 
-对应产物分别位于 `src-tauri/target/aarch64-apple-darwin/release/bundle/` 和 `src-tauri/target/x86_64-apple-darwin/release/bundle/`。可使用 `bash scripts/verify-macos-architecture.sh <MDView.app路径> <Rust target>` 校验应用包实际架构。
+对应产物分别位于 `src-tauri/target/aarch64-apple-darwin/release/bundle/` 和 `src-tauri/target/x86_64-apple-darwin/release/bundle/`。可使用 `bash scripts/verify-macos-architecture.sh <MDView.app路径> <Rust target>` 校验应用包实际架构和代码签名。
 
 ### 发布与应用内更新
 
@@ -126,7 +128,7 @@ npm run tauri build -- --target x86_64-apple-darwin
 - CI 创建的是 **draft release**，必须人工 publish 后，客户端才能通过 `latest.json` 检测到新版本。
 - 应用内更新功能自带该功能的版本起生效；更早版本的用户需手动下载安装一次。
 - 更新包使用 minisign 密钥签名，CI 依赖 GitHub Secrets：`TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。私钥务必离线备份——丢失后已发布版本将无法再自动更新。
-- 发布前确认三个构建任务均成功，`latest.json` 同时包含 `darwin-aarch64`、`darwin-x86_64` 和 Windows 平台条目，且 URL、签名和更新包架构对应。失败的 draft release 不得发布。
+- 发布前确认 workflow 全部任务均成功（`verify-updater-json` 会检查 `latest.json` 是否同时包含 `darwin-aarch64`、`darwin-x86_64` 和 `windows-x86_64` 条目），并核对 URL、签名和更新包架构对应。失败的 draft release 不得发布。
 
 ## 快捷键
 

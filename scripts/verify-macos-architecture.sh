@@ -33,3 +33,6 @@ while IFS= read -r -d '' binary; do
     verify_binary "$binary"
   fi
 done < <(find "$app_path/Contents" -type f -print0)
+
+codesign --verify --deep --strict "$app_path" || { echo "代码签名无效：$app_path" >&2; exit 1; }
+echo "代码签名校验通过：$app_path"
